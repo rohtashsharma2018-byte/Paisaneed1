@@ -1,0 +1,20 @@
+{
+  "name": "paisaneed-crm",
+  "version": "1.0.0",
+  "description": "Lead & Calling Agent CRM",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "echo 'No build step required'",
+    "lint": "echo 'No lint step required'",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.7.4",
+    "serverless-http": "^4.0.0"
+  }
+}

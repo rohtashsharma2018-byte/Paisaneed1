@@ -1,0 +1,3721 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paisa Need – Lead & Calling Agent CRM</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config={theme:{extend:{fontFamily:{display:['Outfit','sans-serif'],body:['DM Sans','sans-serif']},colors:{brand:{50:'#ecfdf5',100:'#d1fae5',200:'#a7f3d0',300:'#6ee7b7',400:'#34d399',500:'#10b981',600:'#059669',700:'#047857',800:'#065f46',900:'#064e3b'},surface:{50:'#fafaf9',100:'#f5f5f4',200:'#e7e5e4',300:'#d6d3d1',400:'#a8a29e',500:'#78716c',600:'#57534e',700:'#44403c',800:'#292524',900:'#1c1917'}}}}}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:#0f110f;color:#e7e5e4;overflow-x:hidden}
+h1,h2,h3,h4,h5,h6{font-family:'Outfit',sans-serif}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#1c1917}
+::-webkit-scrollbar-thumb{background:#44403c;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#57534e}
+
+/* Sidebar */
+.sidebar{width:260px;min-height:100vh;background:#1c1917;border-right:1px solid #292524;position:fixed;left:0;top:0;z-index:40;transition:width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)}
+.sidebar.collapsed{transform:translateX(-260px)}
+.sidebar-link{display:flex;align-items:center;gap:12px;padding:10px 20px;color:#a8a29e;font-size:14px;transition:all .2s;border-radius:8px;margin:2px 12px;cursor:pointer}
+.sidebar-link:hover{color:#e7e5e4;background:#292524}
+.sidebar-link.active{color:#10b981;background:rgba(16,185,129,.1);font-weight:600}
+.sidebar-link i{width:20px;text-align:center;font-size:15px}
+
+/* Main content */
+.main-content{margin-left:260px;min-height:100vh;transition:margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)}
+.main-content.expanded{margin-left:0}
+
+@media (min-width: 1025px) {
+  /* Override collapsed for desktop to be width-based instead of fully hidden */
+  .sidebar.collapsed {
+    width: 72px !important;
+    transform: none !important;
+  }
+  .main-content.expanded {
+    margin-left: 72px !important;
+  }
+  
+  /* Collapsed sidebar structural overrides */
+  .sidebar.collapsed .logo-container {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+  .sidebar.collapsed .logo-container > div {
+    justify-content: center !important;
+    gap: 0 !important;
+  }
+  .sidebar.collapsed .logo-text {
+    display: none !important;
+  }
+  .sidebar.collapsed .sidebar-section-header {
+    display: none !important;
+  }
+  .sidebar.collapsed .sidebar-link {
+    justify-content: center !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 8px !important;
+    margin-right: 8px !important;
+    gap: 0 !important;
+  }
+  .sidebar.collapsed .sidebar-link span {
+    display: none !important;
+  }
+  .sidebar.collapsed .sidebar-link i {
+    font-size: 16px !important;
+  }
+  .sidebar.collapsed .sidebar-link .ml-auto {
+    display: none !important; /* Hide notification/calling badges when collapsed */
+  }
+  .sidebar.collapsed .user-card-container {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+  .sidebar.collapsed .user-card-container > div {
+    justify-content: center !important;
+    gap: 0 !important;
+  }
+  .sidebar.collapsed .user-card-info,
+  .sidebar.collapsed .user-card-action {
+    display: none !important;
+  }
+  .sidebar.collapsed .fa-angle-double-left {
+    transform: rotate(180deg) !important;
+  }
+}
+
+/* Cards */
+.card{background:#1c1917;border:1px solid #292524;border-radius:12px;padding:24px;transition:all .3s}
+.card:hover{border-color:#44403c}
+.stat-card{position:relative;overflow:hidden}
+.stat-card::after{content:'';position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;opacity:.08}
+.stat-card.emerald::after{background:#10b981}
+.stat-card.amber::after{background:#f59e0b}
+.stat-card.sky::after{background:#0ea5e9}
+.stat-card.rose::after{background:#f43f5e}
+
+/* Status badges */
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500}
+.badge-new{background:rgba(16,185,129,.15);color:#34d399}
+.badge-contacted{background:rgba(14,165,233,.15);color:#38bdf8}
+.badge-interested{background:rgba(168,85,247,.15);color:#c084fc}
+.badge-documents-pending{background:rgba(245,158,11,.15);color:#fbbf24}
+.badge-login-done{background:rgba(59,130,246,.15);color:#60a5fa}
+.badge-disbursed{background:rgba(16,185,129,.25);color:#6ee7b7}
+.badge-rejected{background:rgba(244,63,94,.15);color:#fb7185}
+.badge-dead{background:rgba(120,113,108,.2);color:#a8a29e}
+.badge-hot{background:rgba(244,63,94,.2);color:#fb7185;animation:pulse-badge 2s infinite}
+@keyframes pulse-badge{0%,100%{opacity:1}50%{opacity:.6}}
+
+/* Table */
+.data-table{width:100%;border-collapse:separate;border-spacing:0}
+.data-table thead th{padding:12px 16px;text-align:left;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#78716c;border-bottom:1px solid #292524;position:sticky;top:0;background:#1c1917;z-index:5}
+.data-table tbody td{padding:12px 16px;font-size:14px;border-bottom:1px solid #1c1917;color:#d6d3d1}
+.data-table tbody tr{transition:background .15s}
+.data-table tbody tr:hover{background:#292524}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.show{display:flex}
+.modal{background:#1c1917;border:1px solid #292524;border-radius:16px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;animation:modalIn .25s ease}
+@keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+
+/* Toast */
+.toast-container{position:fixed;top:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px}
+.toast{padding:14px 20px;border-radius:10px;font-size:14px;display:flex;align-items:center;gap:10px;animation:toastIn .3s ease;min-width:300px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.toast-success{background:#065f46;border:1px solid #10b981;color:#6ee7b7}
+.toast-error{background:#7f1d1d;border:1px solid #f43f5e;color:#fda4af}
+.toast-info{background:#1e3a5f;border:1px solid #0ea5e9;color:#7dd3fc}
+@keyframes toastIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}
+
+/* Form inputs */
+.form-input{width:100%;padding:10px 14px;background:#0f110f;border:1px solid #292524;border-radius:8px;color:#e7e5e4;font-size:14px;font-family:'DM Sans',sans-serif;transition:border-color .2s;outline:none}
+.form-input:focus{border-color:#10b981}
+.form-input::placeholder{color:#57534e}
+select.form-input{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2378716c' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+select.form-input option{background:#1c1917;color:#e7e5e4}
+textarea.form-input{resize:vertical;min-height:80px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;border:none;outline:none;white-space:nowrap;flex-shrink:0}
+.btn-primary{background:#10b981;color:#022c22}
+.btn-primary:hover{background:#34d399;transform:translateY(-1px);box-shadow:0 4px 12px rgba(16,185,129,.3)}
+.btn-secondary{background:#292524;color:#d6d3d1;border:1px solid #44403c}
+.btn-secondary:hover{background:#44403c}
+.btn-danger{background:#7f1d1d;color:#fda4af}
+.btn-danger:hover{background:#991b1b}
+.btn-ghost{background:transparent;color:#a8a29e;padding:8px 12px}
+.btn-ghost:hover{color:#e7e5e4;background:#292524}
+.btn-sm{padding:6px 14px;font-size:13px}
+
+/* Kanban */
+.kanban-col{min-width:260px;max-width:280px;flex-shrink:0}
+.kanban-card{background:#1c1917;border:1px solid #292524;border-radius:10px;padding:14px;cursor:pointer;transition:all .2s}
+.kanban-card:hover{border-color:#10b981;transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.3)}
+
+/* Notification dot */
+.notif-dot{width:8px;height:8px;background:#f43f5e;border-radius:50%;position:absolute;top:-2px;right:-2px;animation:pulse-badge 2s infinite}
+
+/* Responsive */
+@media(max-width:1024px){
+  .sidebar{transform:translateX(-260px)}
+  .sidebar.open{transform:translateX(0)}
+  .main-content{margin-left:0!important}
+}
+
+/* Animations */
+.fade-in{animation:fadeIn .4s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.slide-up{animation:slideUp .5s ease}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+/* Priority indicator */
+.priority-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.priority-hot{background:#f43f5e}
+.priority-warm{background:#f59e0b}
+.priority-cold{background:#78716c}
+
+/* Background subtle pattern */
+.bg-pattern{background-image:radial-gradient(circle at 1px 1px,rgba(16,185,129,.03) 1px,transparent 0);background-size:32px 32px}
+
+/* Glow effect */
+.glow-emerald{box-shadow:0 0 40px rgba(16,185,129,.08)}
+
+/* Light Theme Overrides */
+body.light-theme {
+  background-color: #f5f5f4;
+  color: #44403c;
+  background-image: radial-gradient(circle at 1px 1px,rgba(16,185,129,.05) 1px,transparent 0);
+}
+body.light-theme .sidebar,
+body.light-theme .card,
+body.light-theme .modal,
+body.light-theme .kanban-card,
+body.light-theme .bg-surface-900,
+body.light-theme header,
+body.light-theme .data-table thead th {
+  background-color: #ffffff;
+  border-color: #e7e5e4;
+}
+body.light-theme .bg-surface-950 {
+  background-color: #f5f5f4;
+}
+body.light-theme .sidebar-link:not(.active) {
+  color: #78716c;
+}
+body.light-theme .sidebar-link:hover {
+  background-color: #f5f5f4;
+  color: #1c1917;
+}
+body.light-theme .text-white:not(.no-theme-reset),
+body.light-theme .font-bold.text-white,
+body.light-theme h1, body.light-theme h2, body.light-theme h3 {
+  color: #1c1917 !important;
+}
+body.light-theme .sidebar-link.active span,
+body.light-theme .sidebar-link.active i {
+  color: #10b981 !important;
+}
+/* Icons on brand background should stay white */
+body.light-theme .bg-brand-600 i,
+body.light-theme .bg-brand-600 span,
+body.light-theme .btn-primary i,
+body.light-theme .btn-primary span {
+  color: #ffffff !important;
+}
+body.light-theme .text-surface-400,
+body.light-theme .text-surface-500 {
+  color: #78716c !important;
+}
+body.light-theme .form-input {
+  background-color: #ffffff;
+  border-color: #d6d3d1;
+  color: #1c1917;
+}
+body.light-theme .form-input:focus {
+  border-color: #10b981;
+}
+body.light-theme .btn-secondary {
+  background-color: #e7e5e4;
+  color: #44403c;
+  border-color: #d6d3d1;
+}
+body.light-theme .btn-secondary:hover {
+  background-color: #d6d3d1;
+}
+body.light-theme .border-surface-800,
+body.light-theme .border-surface-700 {
+  border-color: #e7e5e4 !important;
+}
+body.light-theme .data-table tbody tr:hover {
+  background-color: #fafaf9;
+}
+body.light-theme .data-table tbody td {
+  color: #44403c;
+  border-bottom-color: #f5f5f4;
+}
+body.light-theme .modal-overlay {
+  background: rgba(0,0,0,.4);
+}
+body.light-theme .bg-surface-800\/50 {
+  background-color: #f5f5f4;
+}
+body.light-theme #loginOverlay {
+  background-color: #f5f5f4;
+}
+body.light-theme #loginOverlay > div {
+  background-color: #ffffff;
+  border-color: #e7e5e4;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+</style>
+</head>
+<body class="bg-pattern">
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Login Overlay -->
+<div id="loginOverlay" class="fixed inset-0 z-[100] bg-[#0f110f] flex items-center justify-center p-4 overflow-y-auto">
+  <div class="w-full max-w-md p-8 bg-surface-900 border border-surface-800 rounded-2xl shadow-2xl">
+    <div class="text-center mb-8">
+      <div class="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-hand-holding-usd text-2xl text-white"></i>
+      </div>
+      <h1 class="font-display font-bold text-2xl text-white">PaisaNeed CRM</h1>
+      <p class="text-surface-400 mt-2">Enter your credentials to continue</p>
+    </div>
+    <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Email Address</label>
+        <input type="email" id="loginEmail" class="form-input" required placeholder="admin@paisaneed.com">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Password</label>
+        <div class="relative">
+          <input type="password" id="loginPassword" class="form-input pr-10" required placeholder="••••••••">
+          <button type="button" onclick="toggleLoginPassword()" class="absolute inset-y-0 right-0 pr-3 flex items-center text-surface-400 hover:text-white transition-colors focus:outline-none" id="togglePasswordBtn">
+            <i class="fas fa-eye text-sm" id="passwordEyeIcon"></i>
+          </button>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary w-full py-3 mt-4" id="loginSubmitBtn">
+        <i class="fas fa-sign-in-alt"></i> Sign In
+      </button>
+    </form>
+    <div class="mt-6 text-center">
+      <p class="text-xs text-surface-500">Demo: admin@paisaneed.com / admin123</p>
+    </div>
+  </div>
+</div>
+
+<div id="appContainer" style="display: none;">
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div class="p-5 border-b border-surface-800 logo-container">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center shrink-0">
+        <i class="fas fa-coins text-white text-sm"></i>
+      </div>
+      <div class="logo-text">
+        <h1 class="font-display font-bold text-base text-white leading-tight">Paisa Need</h1>
+        <p class="text-[11px] text-surface-400 font-medium tracking-wide uppercase">Lead CRM</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="p-3">
+    <p class="text-[10px] font-semibold text-surface-500 uppercase tracking-widest px-3 mb-2 mt-2 sidebar-section-header">Main</p>
+    <div class="sidebar-link active" data-page="dashboard" onclick="navigateTo('dashboard')">
+      <i class="fas fa-chart-pie"></i><span>Dashboard</span>
+    </div>
+    <div class="sidebar-link" data-page="leads" onclick="navigateTo('leads')">
+      <i class="fas fa-users"></i><span>Leads</span>
+    </div>
+    <div class="sidebar-link" data-page="pipeline" onclick="navigateTo('pipeline')">
+      <i class="fas fa-columns"></i><span>Pipeline</span>
+    </div>
+    <div class="sidebar-link" data-page="calling" onclick="navigateTo('calling')">
+      <i class="fas fa-phone-alt"></i><span>Calling Queue</span>
+      <span class="ml-auto bg-brand-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full" id="callingCount">0</span>
+    </div>
+    <div class="sidebar-link" data-page="workHistory" onclick="navigateTo('workHistory')">
+      <i class="fas fa-history"></i><span>Work History</span>
+    </div>
+    <div class="sidebar-link" data-page="reports" onclick="navigateTo('reports')">
+      <i class="fas fa-chart-line"></i><span>Reports</span>
+    </div>
+
+    <p class="text-[10px] font-semibold text-surface-500 uppercase tracking-widest px-3 mb-2 mt-5 sidebar-section-header" id="manageLabel" style="display:none">Management</p>
+    <div class="sidebar-link" data-page="team" onclick="navigateTo('team')" id="navTeam" style="display:none">
+      <i class="fas fa-user-friends"></i><span>Team</span>
+    </div>
+    <div class="sidebar-link" data-page="allocations" onclick="navigateTo('allocations')" id="navAllocations" style="display:none">
+      <i class="fas fa-exchange-alt"></i><span>Allocations</span>
+    </div>
+
+    <div class="sidebar-link" data-page="settings" onclick="navigateTo('settings')" id="navSettings" style="display:none">
+      <i class="fas fa-cog"></i><span>Settings</span>
+    </div>
+
+    <!-- Collapse Sidebar Option -->
+    <div class="sidebar-link hidden lg:flex mt-6 border-t border-surface-800/60 pt-4" onclick="toggleSidebar()" title="Collapse Sidebar">
+      <i class="fas fa-angle-double-left text-surface-500"></i><span class="text-surface-400 font-medium">Collapse Menu</span>
+    </div>
+  </div>
+
+  <!-- User card at bottom -->
+  <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-surface-800 user-card-container">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-full bg-surface-800 flex items-center justify-center text-sm font-bold text-brand-400 shrink-0" id="userAvatar">A</div>
+      <div class="flex-1 min-w-0 user-card-info">
+        <p class="text-sm font-semibold text-white truncate" id="userName">Admin User</p>
+        <p class="text-[11px] text-surface-400 capitalize" id="userRole">Admin</p>
+      </div>
+      <button class="btn-ghost rounded-lg text-sm text-brand-400 hover:text-brand-300 mr-1 user-card-action" onclick="showChangePasswordModal()" title="Change Password">
+        <i class="fas fa-key"></i>
+      </button>
+      <button class="btn-ghost rounded-lg text-sm text-rose-400 hover:text-rose-300 user-card-action" onclick="handleLogout()" title="Logout">
+        <i class="fas fa-sign-out-alt"></i>
+      </button>
+    </div>
+  </div>
+</aside>
+
+<!-- Main Content -->
+<div class="main-content" id="mainContent">
+  <!-- Top bar -->
+  <header class="sticky top-0 z-30 bg-[#0f110f]/80 backdrop-blur-lg border-b border-surface-800">
+    <div class="flex items-center justify-between px-6 h-16">
+      <div class="flex items-center gap-4">
+        <button class="btn-ghost rounded-lg" onclick="toggleSidebar()" title="Toggle Sidebar">
+          <i class="fas fa-bars text-lg"></i>
+        </button>
+        <div class="relative">
+          <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-surface-500 text-sm"></i>
+          <input type="text" placeholder="Search leads, agents..." class="form-input pl-10 pr-4 py-2 w-64 md:w-80 text-sm" id="globalSearch" oninput="handleGlobalSearch(this.value)">
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button class="btn-ghost rounded-lg relative" onclick="toggleNotifications()">
+          <i class="fas fa-bell text-lg"></i>
+          <span class="notif-dot" id="notifDot"></span>
+        </button>
+        <button class="btn btn-primary btn-sm rounded-full" onclick="showAddLeadModal()" id="addLeadBtn">
+          <i class="fas fa-plus"></i><span class="hidden sm:inline">Add Lead</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Page container -->
+  <div class="p-6" id="pageContainer">
+    <!-- Pages rendered here by JS -->
+  </div>
+</div>
+
+<!-- Notifications Panel -->
+<div class="fixed inset-0 z-50 hidden" id="notifPanel">
+  <div class="absolute inset-0 bg-black/50" onclick="toggleNotifications()"></div>
+  <div class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-surface-900 border-l border-surface-800 p-6 overflow-y-auto" style="animation:modalIn .25s ease">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="font-display font-bold text-lg text-white">Notifications</h3>
+      <button class="btn-ghost rounded-lg" onclick="toggleNotifications()"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="notifList"></div>
+  </div>
+</div>
+
+<!-- Add Lead Modal -->
+<div class="modal-overlay" id="addLeadModal">
+  <div class="modal">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white" id="leadModalTitle">Add New Lead</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('addLeadModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="leadForm" class="p-6 space-y-4" onsubmit="handleLeadSubmit(event)">
+      <input type="hidden" id="leadEditId">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">Full Name *</label>
+          <input type="text" class="form-input" id="leadName" required placeholder="Rajesh Kumar">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">Phone *</label>
+          <input type="tel" class="form-input" id="leadPhone" required placeholder="9876543210">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">Email</label>
+          <input type="email" class="form-input" id="leadEmail" placeholder="rajesh@email.com">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">City</label>
+          <input type="text" class="form-input" id="leadCity" placeholder="Mumbai">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">Loan Type *</label>
+          <select class="form-input" id="leadLoanType" required>
+            <option value="">Select loan type</option>
+            <option value="personal">Personal Loan</option>
+            <option value="home">Home Loan</option>
+            <option value="business">Business Loan</option>
+            <option value="lap">Loan Against Property</option>
+            <option value="credit_card">Credit Card</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">Amount Required *</label>
+          <input type="number" class="form-input" id="leadAmount" required placeholder="500000" min="0">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">Status</label>
+          <select class="form-input" id="leadStatus">
+            <option value="new">New</option>
+            <option value="contacted">Contacted</option>
+            <option value="interested">Interested</option>
+            <option value="documents_pending">Documents Pending</option>
+            <option value="login_done">Login Done</option>
+            <option value="disbursed">Disbursed</option>
+            <option value="rejected">Rejected</option>
+            <option value="not_interested">Not Interested</option>
+            <option value="dead">Dead</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">Source</label>
+          <select class="form-input" id="leadSource">
+            <option value="website">Website</option>
+            <option value="referral">Referral</option>
+            <option value="campaign">Campaign</option>
+            <option value="facebook">Facebook Ads</option>
+            <option value="google">Google Ads</option>
+            <option value="walkin">Walk-in</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">Priority</label>
+          <select class="form-input" id="leadPriority">
+            <option value="cold">Cold</option>
+            <option value="warm">Warm</option>
+            <option value="hot">Hot</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">Assign To</label>
+          <select class="form-input" id="leadAgent">
+            <option value="">Auto-assign</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Notes</label>
+        <textarea class="form-input" id="leadNotes" placeholder="Any initial notes about this lead..."></textarea>
+      </div>
+      <div id="duplicateWarning" class="hidden bg-amber-900/30 border border-amber-600/50 rounded-lg p-3 text-sm text-amber-300">
+        <i class="fas fa-exclamation-triangle mr-2"></i><span id="duplicateMsg"></span>
+      </div>
+      <div class="flex justify-between items-center gap-3 pt-2">
+        <div>
+          <button type="button" id="leadDeleteBtn" class="btn btn-ghost text-rose-500 hidden" onclick="handleModalDelete()">
+            <i class="fas fa-trash-alt mr-2"></i> Delete Lead
+          </button>
+        </div>
+        <div class="flex gap-3">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('addLeadModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="leadSubmitBtn">Add Lead</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Member Modal -->
+<div class="modal-overlay" id="addMemberModal">
+  <div class="modal" style="max-width:500px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white" id="memberModalTitle">Add New Member</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('addMemberModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="memberForm" class="p-6 space-y-4" onsubmit="handleMemberSubmit(event)">
+      <input type="hidden" id="memberEditId">
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Full Name *</label>
+        <input type="text" class="form-input" id="memberName" required placeholder="Anita Kumari">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Email *</label>
+        <input type="email" class="form-input" id="memberEmail" required placeholder="anita@paisaneed.com">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Role *</label>
+        <select class="form-input" id="memberRole" required>
+          <option value="agent">Agent</option>
+          <option value="tl">Team Leader</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Team</label>
+        <select class="form-input" id="memberTeam">
+          <option value="">No Team</option>
+          <option value="t1">Team Alpha</option>
+          <option value="t2">Team Beta</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5" id="memberPasswordLabel">Password *</label>
+        <div class="relative">
+          <input type="password" class="form-input pr-10" id="memberPassword" required placeholder="Min 6 characters (e.g. Paisa@123)">
+          <button type="button" onclick="togglePasswordVisibility('memberPassword', 'memberPasswordEyeIcon')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-surface-400 hover:text-white transition-colors focus:outline-none">
+            <i class="fas fa-eye text-sm" id="memberPasswordEyeIcon"></i>
+          </button>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addMemberModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="memberSubmitBtn">Add Member</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Loan Type Modal -->
+<div class="modal-overlay" id="addLoanTypeModal">
+  <div class="modal" style="max-width:400px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white" id="loanTypeModalTitle">Add Loan Type</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('addLoanTypeModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="loanTypeForm" class="p-6 space-y-4" onsubmit="handleLoanTypeSubmit(event)">
+      <input type="hidden" id="loanTypeEditKey">
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Loan Type Code/Key (lowercase, no spaces) *</label>
+        <input type="text" class="form-input" id="loanTypeKey" required placeholder="gold_loan">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Loan Type Display Name *</label>
+        <input type="text" class="form-input" id="loanTypeName" required placeholder="Gold Loan">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addLoanTypeModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="loanTypeSubmitBtn">Add Loan Type</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Lead Source Modal -->
+<div class="modal-overlay" id="addSourceModal">
+  <div class="modal" style="max-width:400px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white" id="sourceModalTitle">Add Lead Source</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('addSourceModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="sourceForm" class="p-6 space-y-4" onsubmit="handleSourceSubmit(event)">
+      <input type="hidden" id="sourceEditKey">
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Source Key (lowercase, no spaces) *</label>
+        <input type="text" class="form-input" id="sourceKey" required placeholder="linkedin">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addSourceModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="sourceSubmitBtn">Add Source</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add/Edit Lead Status Modal -->
+<div class="modal-overlay" id="addLeadStatusModal">
+  <div class="modal" style="max-width:400px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white" id="leadStatusModalTitle">Add Lead Status</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('addLeadStatusModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="leadStatusForm" class="p-6 space-y-4" onsubmit="handleLeadStatusSubmit(event)">
+      <input type="hidden" id="leadStatusEditKey">
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Status Key (lowercase, no spaces) *</label>
+        <input type="text" class="form-input" id="leadStatusKey" required placeholder="follow_up_required">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Status Display Name *</label>
+        <input type="text" class="form-input" id="leadStatusName" required placeholder="Follow-up Required">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addLeadStatusModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="leadStatusSubmitBtn">Add Lead Status</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add/Edit Lead Priority Modal -->
+<div class="modal-overlay" id="addLeadPriorityModal">
+  <div class="modal" style="max-width:400px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white" id="leadPriorityModalTitle">Add Lead Priority</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('addLeadPriorityModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="leadPriorityForm" class="p-6 space-y-4" onsubmit="handleLeadPrioritySubmit(event)">
+      <input type="hidden" id="leadPriorityEditKey">
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Priority Key (lowercase, no spaces) *</label>
+        <input type="text" class="form-input" id="leadPriorityKey" required placeholder="urgent">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Priority Display Name *</label>
+        <input type="text" class="form-input" id="leadPriorityName" required placeholder="Urgent">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addLeadPriorityModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="leadPrioritySubmitBtn">Add Lead Priority</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add/Edit Team Modal -->
+<div class="modal-overlay" id="addTeamModal">
+  <div class="modal" style="max-width:400px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white" id="teamModalTitle">Add Team Name</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('addTeamModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="teamForm" class="p-6 space-y-4" onsubmit="handleTeamSubmit(event)">
+      <input type="hidden" id="teamEditId">
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Team Name *</label>
+        <input type="text" class="form-input" id="teamNameInput" required placeholder="Team Gamma">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Team Leader</label>
+        <select class="form-input" id="teamLeaderSelect">
+          <option value="">Unassigned</option>
+        </select>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addTeamModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="teamSubmitBtn">Add Team Name</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Call Log Modal -->
+<div class="modal-overlay" id="callLogModal">
+  <div class="modal">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white">Log Call</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('callLogModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form class="p-6 space-y-4" onsubmit="handleCallLogSubmit(event)">
+      <input type="hidden" id="callLeadId">
+      <div class="bg-surface-800/50 rounded-lg p-4 mb-2">
+        <p class="text-white font-semibold" id="callLeadName"></p>
+        <p class="text-surface-400 text-sm" id="callLeadPhone"></p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Call Outcome *</label>
+        <select class="form-input" id="callOutcome" required>
+          <option value="">Select outcome</option>
+          <option value="answered">Answered</option>
+          <option value="not_answered">Not Answered</option>
+          <option value="busy">Busy</option>
+          <option value="wrong_number">Wrong Number</option>
+          <option value="callback_requested">Callback Requested</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Update Lead Status</label>
+        <select class="form-input" id="callStatusUpdate">
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="interested">Interested</option>
+          <option value="documents_pending">Documents Pending</option>
+          <option value="login_done">Login Done</option>
+          <option value="disbursed">Disbursed</option>
+          <option value="rejected">Rejected</option>
+          <option value="not_interested">Not Interested</option>
+          <option value="dead">Dead</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Update Priority</label>
+        <select class="form-input" id="callPriorityUpdate">
+          <option value="cold">Cold</option>
+          <option value="warm">Warm</option>
+          <option value="hot">Hot</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Call Notes</label>
+        <textarea class="form-input" id="callNotes" placeholder="Discuss loan requirements, interest rate expectations, documents needed..."></textarea>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Next Follow-up</label>
+        <input type="datetime-local" class="form-input" id="callFollowUp">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('callLogModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-phone-alt"></i> Log Call</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Lead Detail Modal -->
+<div class="modal-overlay" id="leadDetailModal">
+  <div class="modal" style="max-width:720px">
+    <div id="leadDetailContent"></div>
+  </div>
+</div>
+
+<!-- Lead Lifecycle Modal -->
+<div class="modal-overlay" id="leadLifecycleModal">
+  <div class="modal" style="max-width:600px">
+    <div id="leadLifecycleContent"></div>
+  </div>
+</div>
+
+<!-- Role Switcher Modal -->
+<div class="modal-overlay" id="roleSwitcher">
+  <div class="modal" style="max-width:400px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white">Switch Role</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('roleSwitcher')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="p-6 space-y-3">
+      <button class="w-full text-left p-4 rounded-lg border border-surface-700 hover:border-brand-500 transition-all flex items-center gap-4" onclick="switchRole('admin')">
+        <div class="w-10 h-10 rounded-lg bg-brand-600/20 flex items-center justify-center"><i class="fas fa-shield-alt text-brand-400"></i></div>
+        <div><p class="font-semibold text-white">Admin</p><p class="text-xs text-surface-400">Full access to everything</p></div>
+      </button>
+      <button class="w-full text-left p-4 rounded-lg border border-surface-700 hover:border-brand-500 transition-all flex items-center gap-4" onclick="switchRole('tl')">
+        <div class="w-10 h-10 rounded-lg bg-sky-600/20 flex items-center justify-center"><i class="fas fa-user-tie text-sky-400"></i></div>
+        <div><p class="font-semibold text-white">Team Leader</p><p class="text-xs text-surface-400">Team visibility & management</p></div>
+      </button>
+      <button class="w-full text-left p-4 rounded-lg border border-surface-700 hover:border-brand-500 transition-all flex items-center gap-4" onclick="switchRole('agent')">
+        <div class="w-10 h-10 rounded-lg bg-amber-600/20 flex items-center justify-center"><i class="fas fa-headset text-amber-400"></i></div>
+        <div><p class="font-semibold text-white">Agent</p><p class="text-xs text-surface-400">Own leads only</p></div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Import Modal -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal" style="max-width:500px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white">Bulk Import Leads</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('importModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="p-6">
+      <div id="csvDropZone" class="border-2 border-dashed border-surface-700 rounded-xl p-10 text-center hover:border-brand-500 hover:bg-brand-600/5 transition-all duration-200 cursor-pointer" onclick="document.getElementById('csvInput').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleCSVDrop(event)">
+        <i class="fas fa-cloud-upload-alt text-4xl text-surface-500 mb-3"></i>
+        <p class="text-white font-medium">Drop CSV file here or click to browse</p>
+        <p class="text-surface-500 text-sm mt-1">Supports .csv files with columns: name, phone, email, city, loan_type, amount, source</p>
+      </div>
+      <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSVImport(event)">
+      <div id="importPreview" class="mt-4 hidden">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-sm text-surface-400"><span id="importCount">0</span> leads found</p>
+          <button class="btn btn-primary btn-sm" onclick="confirmImport()"><i class="fas fa-check"></i> Import All</button>
+        </div>
+        <div class="max-h-48 overflow-y-auto rounded-lg border border-surface-800" id="importTable"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="importErrorsModal">
+  <div class="modal" style="max-width:500px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white">Import Issues</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('importErrorsModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="p-6">
+      <div id="importErrorsList" class="text-surface-300 text-sm space-y-2"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal" style="max-width:400px">
+    <div class="p-6">
+      <div class="flex items-center gap-4 mb-4">
+        <div class="w-12 h-12 rounded-full bg-rose-600/20 flex items-center justify-center flex-shrink-0">
+          <i class="fas fa-exclamation-triangle text-xl text-rose-400"></i>
+        </div>
+        <div>
+          <h3 class="font-display font-bold text-lg text-white" id="confirmModalTitle">Confirm Action</h3>
+          <p class="text-sm text-surface-400 mt-1" id="confirmModalMessage">Are you sure you want to proceed?</p>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-6">
+        <button class="btn btn-secondary" onclick="closeModal('confirmModal')">Cancel</button>
+        <button class="btn btn-primary bg-rose-600 hover:bg-rose-700 text-white border-0" id="confirmModalBtn" onclick="executeConfirm()">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="modal-overlay" id="changePasswordModal">
+  <div class="modal" style="max-width:400px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white">Change Password</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('changePasswordModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="changePasswordForm" class="p-6 space-y-4" onsubmit="handleChangePasswordSubmit(event)">
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">New Password *</label>
+        <div class="relative">
+          <input type="password" class="form-input pr-10" id="newPasswordInput" required placeholder="••••••••">
+          <button type="button" onclick="togglePasswordVisibility('newPasswordInput', 'newPasswordEyeIcon')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-surface-400 hover:text-white transition-colors focus:outline-none">
+            <i class="fas fa-eye text-sm" id="newPasswordEyeIcon"></i>
+          </button>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Confirm New Password *</label>
+        <div class="relative">
+          <input type="password" class="form-input pr-10" id="confirmNewPasswordInput" required placeholder="••••••••">
+          <button type="button" onclick="togglePasswordVisibility('confirmNewPasswordInput', 'confirmNewPasswordEyeIcon')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-surface-400 hover:text-white transition-colors focus:outline-none">
+            <i class="fas fa-eye text-sm" id="confirmNewPasswordEyeIcon"></i>
+          </button>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('changePasswordModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="changePasswordSubmitBtn">Change Password</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modularized JS Component Scripts -->
+<script src="/js/utils.js"></script>
+<script src="/js/dashboard.js"></script>
+<script src="/js/leads.js"></script>
+<script src="/js/pipeline.js"></script>
+<script src="/js/calling-queue.js"></script>
+<script src="/js/team.js"></script>
+<script src="/js/allocation.js"></script>
+<script src="/js/work-history.js"></script>
+<script src="/js/reports.js"></script>
+
+<script>
+// ========== STATE ==========
+const APP = {
+  currentPage: 'dashboard',
+  currentRole: 'admin',
+  currentUserId: null,
+  userName: '',
+  token: localStorage.getItem('token'),
+  charts: {},
+  searchQuery: '',
+  teamRoleFilter: 'all',
+  teamViewMode: 'list',
+  theme: localStorage.getItem('theme') || 'dark',
+  activeSettingsTab: 'general'
+};
+
+function setTheme(theme) {
+  APP.theme = theme;
+  localStorage.setItem('theme', theme);
+  if (theme === 'light') {
+    document.body.classList.add('light-theme');
+  } else {
+    document.body.classList.remove('light-theme');
+  }
+  // Update charts if they exist
+  if (APP.currentPage === 'dashboard') initDashboardCharts();
+  
+  if (APP.currentPage === 'settings') renderPage();
+}
+
+function changeSettingsTab(tabId) {
+  APP.activeSettingsTab = tabId;
+  renderPage();
+}
+
+function getChartTheme() {
+  const isLight = APP.theme === 'light';
+  return {
+    gridColor: isLight ? '#e7e5e4' : '#292524',
+    tickColor: isLight ? '#78716c' : '#a8a29e',
+    labelColor: isLight ? '#1c1917' : '#e7e5e4',
+    mutedTickColor: isLight ? '#a8a29e' : '#57534e'
+  };
+}
+
+function initTheme() {
+  if (APP.theme === 'light') {
+    document.body.classList.add('light-theme');
+  }
+}
+
+// ========== DATA ==========
+let TEAMS = [];
+let USERS = [];
+let LOAN_TYPES = [];
+let LOAN_LABELS = { personal: 'Personal Loan', home: 'Home Loan', business: 'Business Loan', lap: 'Loan Against Property', credit_card: 'Credit Card' };
+let STATUSES = ['new', 'contacted', 'interested', 'documents_pending', 'login_done', 'disbursed', 'rejected', 'not_interested', 'dead'];
+let STATUS_LABELS = { new: 'New', contacted: 'Contacted', interested: 'Interested', documents_pending: 'Docs Pending', login_done: 'Login Done', disbursed: 'Disbursed', rejected: 'Rejected', not_interested: 'Not Interested', dead: 'Dead' };
+let PRIORITIES = ['cold', 'warm', 'hot'];
+let PRIORITY_LABELS = { cold: 'Cold', warm: 'Warm', hot: 'Hot' };
+let SOURCES = [];
+
+let leads = [];
+let selectedLeadIds = [];
+let callLogs = [];
+let allocationHistory = [];
+let NOTIFICATIONS = [];
+let TARGETS = { teams: {}, agents: {} };
+let DISTRIBUTION_RULES = { method: 'round_robin', max_leads: 15, aging_days: 3 };
+let REPORTS_FILTER = { dateRange: 'all_time', teamId: 'all', agentId: 'all', startDate: '', endDate: '' };
+let leadsFilter = { status: [], loanType: [], source: [], agent: [], aging: [], search: '', sort: 'created_at', dir: 'desc' };
+let workHistoryFilter = { search: '', agentId: 'all', dateRange: '30', startDate: '', endDate: '', outcome: 'all', priority: 'all' };
+let showColumnSelector = false;
+let workHistoryColumns = {
+  dateTime: { label: 'Date & Time', visible: true },
+  agent: { label: 'Agent', visible: true },
+  team: { label: 'Team Name', visible: true },
+  lead: { label: 'Lead', visible: true },
+  phone: { label: 'Phone', visible: true },
+  email: { label: 'Email', visible: true },
+  loanAmount: { label: 'Loan Amount', visible: true },
+  loanType: { label: 'Loan Type', visible: true },
+  leadStatus: { label: 'Lead Status', visible: true },
+  priority: { label: 'Priority', visible: true },
+  aging: { label: 'Aging', visible: true },
+  outcome: { label: 'Call Outcome', visible: true },
+  notes: { label: 'Notes', visible: true },
+  followUp: { label: 'Follow-up Due', visible: true }
+};
+let leadIdCounter = 1;
+let callIdCounter = 1;
+let allocIdCounter = 1;
+
+let COMPANY_PROFILE = {
+  name: '',
+  contact_person: '',
+  email: '',
+  mobile: '',
+  address: '',
+  website: '',
+  other: ''
+};
+
+async function fetchAPI(endpoint, options = {}) {
+  const url = `/api${endpoint}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(APP.token ? { 'Authorization': `Bearer ${APP.token}` } : {}),
+    ...options.headers
+  };
+  
+  try {
+    const response = await fetch(url, { ...options, headers });
+    if (response.status === 401 && APP.token) {
+      handleLogout();
+      return null;
+    }
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Something went wrong');
+    return data;
+  } catch (err) {
+    toast(err.message, 'error');
+    throw err;
+  }
+}
+
+function toggleLoginPassword() {
+  const pwdInput = document.getElementById('loginPassword');
+  const eyeIcon = document.getElementById('passwordEyeIcon');
+  if (pwdInput && eyeIcon) {
+    if (pwdInput.type === 'password') {
+      pwdInput.type = 'text';
+      eyeIcon.className = 'fas fa-eye-slash text-sm';
+    } else {
+      pwdInput.type = 'password';
+      eyeIcon.className = 'fas fa-eye text-sm';
+    }
+  }
+}
+
+function togglePasswordVisibility(inputId, iconId) {
+  const pwdInput = document.getElementById(inputId);
+  const eyeIcon = document.getElementById(iconId);
+  if (pwdInput && eyeIcon) {
+    if (pwdInput.type === 'password') {
+      pwdInput.type = 'text';
+      eyeIcon.className = 'fas fa-eye-slash text-sm';
+    } else {
+      pwdInput.type = 'password';
+      eyeIcon.className = 'fas fa-eye text-sm';
+    }
+  }
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  const btn = document.getElementById('loginSubmitBtn');
+  
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+  
+  try {
+    const res = await fetchAPI('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+    
+    if (res && res.token) {
+      APP.token = res.token;
+      APP.currentUserId = res.user.id;
+      APP.currentRole = res.user.role;
+      APP.userName = res.user.name;
+      localStorage.setItem('token', res.token);
+      localStorage.setItem('user', JSON.stringify(res.user));
+      
+      document.getElementById('loginOverlay').style.display = 'none';
+      toast('Login successful');
+      await initApp();
+    }
+  } catch (err) {
+    // Error handled by fetchAPI toast
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+  }
+}
+
+function handleLogout() {
+  APP.token = null;
+  APP.currentUserId = null;
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  document.getElementById('appContainer').style.display = 'none';
+  document.getElementById('loginOverlay').style.display = 'flex';
+  toast('Logged out successfully', 'info');
+}
+
+function setLeads(leadsData) {
+  leads = (leadsData || []).map(l => ({ ...l, id: l._id }));
+}
+
+async function initApp() {
+  initTheme();
+  if (!APP.token) {
+    document.getElementById('appContainer').style.display = 'none';
+    document.getElementById('loginOverlay').style.display = 'flex';
+    return;
+  }
+  
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('appContainer').style.display = 'block';
+  initSidebar();
+  
+  try {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user) {
+      APP.currentUserId = user.id;
+      APP.currentRole = user.role;
+      APP.userName = user.name;
+    }
+
+    const [
+      leadsData, usersData, teamsData, loanTypesData, sourcesData, distRulesData,
+      allocHistoryData, callsData, loanLabelsData, companyProfileData,
+      leadStatusesData, leadStatusLabelsData, leadPrioritiesData, leadPriorityLabelsData,
+      targetsData
+    ] = await Promise.all([
+      fetchAPI('/leads'),
+      fetchAPI('/users'),
+      fetchAPI('/teams'),
+      fetchAPI('/settings/loan_types'),
+      fetchAPI('/settings/sources'),
+      fetchAPI('/settings/distribution_rules'),
+      fetchAPI('/settings/allocation_history').catch(() => []),
+      fetchAPI('/calls').catch(() => []),
+      fetchAPI('/settings/loan_labels').catch(() => ({})),
+      fetchAPI('/settings/company_profile').catch(() => ({})),
+      fetchAPI('/settings/lead_statuses').catch(() => []),
+      fetchAPI('/settings/lead_status_labels').catch(() => ({})),
+      fetchAPI('/settings/lead_priorities').catch(() => []),
+      fetchAPI('/settings/lead_priority_labels').catch(() => ({})),
+      fetchAPI('/settings/targets').catch(() => ({}))
+    ]);
+    
+    setLeads(leadsData);
+    USERS = (usersData || []).map(u => ({ ...u, id: u._id }));
+    TEAMS = (teamsData || []).map(t => ({ ...t, id: t._id }));
+    allocationHistory = (Array.isArray(allocHistoryData) ? allocHistoryData : []).filter(al => 
+      leads.some(l => l.id === al.lead_id || l._id === al.lead_id)
+    );
+    callLogs = (Array.isArray(callsData) ? callsData : []).filter(c => 
+      leads.some(l => l.id === c.lead_id || l._id === c.lead_id)
+    );
+    LOAN_TYPES = loanTypesData && loanTypesData.length > 0 ? loanTypesData : ['personal', 'home', 'business', 'lap', 'credit_card'];
+    if (loanLabelsData && typeof loanLabelsData === 'object' && !Array.isArray(loanLabelsData)) {
+      LOAN_LABELS = { ...LOAN_LABELS, ...loanLabelsData };
+    }
+    SOURCES = sourcesData && sourcesData.length > 0 ? sourcesData : ['website', 'referral', 'campaign', 'facebook', 'google', 'walkin'];
+    if (distRulesData && distRulesData.method) DISTRIBUTION_RULES = distRulesData;
+    
+    if (companyProfileData && typeof companyProfileData === 'object' && !Array.isArray(companyProfileData)) {
+      COMPANY_PROFILE = { ...COMPANY_PROFILE, ...companyProfileData };
+    }
+
+    if (leadStatusesData && leadStatusesData.length > 0) {
+      STATUSES = leadStatusesData;
+    }
+    if (leadStatusLabelsData && typeof leadStatusLabelsData === 'object' && !Array.isArray(leadStatusLabelsData)) {
+      STATUS_LABELS = { ...STATUS_LABELS, ...leadStatusLabelsData };
+    }
+    if (targetsData && typeof targetsData === 'object' && !Array.isArray(targetsData)) {
+      TARGETS = { ...TARGETS, ...targetsData };
+    }
+    if (leadPrioritiesData && leadPrioritiesData.length > 0) {
+      PRIORITIES = leadPrioritiesData;
+    }
+    if (leadPriorityLabelsData && typeof leadPriorityLabelsData === 'object' && !Array.isArray(leadPriorityLabelsData)) {
+      PRIORITY_LABELS = { ...PRIORITY_LABELS, ...leadPriorityLabelsData };
+    }
+    
+    updateUserUI();
+    navigateTo('dashboard');
+  } catch (err) {
+    console.error('App init error:', err);
+  }
+}
+
+function toast(message, type = 'success') {
+  const container = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  const icon = type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle';
+  t.innerHTML = `<i class="fas fa-${icon}"></i><span>${message}</span>`;
+  container.appendChild(t);
+  setTimeout(() => { t.style.animation = 'toastOut .3s ease forwards'; setTimeout(() => t.remove(), 300); }, 3500);
+}
+
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+function showChangePasswordModal() {
+  document.getElementById('changePasswordForm').reset();
+  openModal('changePasswordModal');
+}
+
+async function handleChangePasswordSubmit(e) {
+  e.preventDefault();
+  const newPassword = document.getElementById('newPasswordInput').value;
+  const confirmNewPassword = document.getElementById('confirmNewPasswordInput').value;
+
+  if (newPassword !== confirmNewPassword) {
+    toast('New passwords do not match', 'error');
+    return;
+  }
+
+  if (newPassword.length < 6) {
+    toast('New password must be at least 6 characters', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('changePasswordSubmitBtn');
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  try {
+    await fetchAPI('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ newPassword })
+    });
+    toast('Password changed successfully');
+    closeModal('changePasswordModal');
+  } catch (err) {
+    // Error handled by fetchAPI
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+let currentConfirmCallback = null;
+
+function showConfirmModal(title, message, callback) {
+  document.getElementById('confirmModalTitle').textContent = title;
+  document.getElementById('confirmModalMessage').textContent = message;
+  currentConfirmCallback = callback;
+  
+  const btn = document.getElementById('confirmModalBtn');
+  btn.disabled = false;
+  btn.classList.remove('opacity-50', 'cursor-not-allowed');
+  
+  openModal('confirmModal');
+}
+function executeConfirm() {
+  if (currentConfirmCallback) currentConfirmCallback();
+  closeModal('confirmModal');
+}
+
+function getUser(id) {
+  if (!id) return null;
+  const targetId = typeof id === 'object' ? (id._id || id.id) : id;
+  return USERS.find(u => u.id === targetId || u._id === targetId);
+}
+function getTeam(id) {
+  if (!id) return null;
+  const targetId = typeof id === 'object' ? (id._id || id.id) : id;
+  return TEAMS.find(t => t.id === targetId || t._id === targetId);
+}
+function getLeadCalls(leadId) { return callLogs.filter(c => c.lead_id === leadId).sort((a,b) => new Date(b.created_at) - new Date(a.created_at)); }
+
+function toggleLeadSelection(id, checked) {
+  if (checked) {
+    if (!selectedLeadIds.includes(id)) selectedLeadIds.push(id);
+  } else {
+    selectedLeadIds = selectedLeadIds.filter(lid => lid !== id);
+  }
+  renderPage();
+}
+
+function toggleAllLeads(checked) {
+  const vl = getFilteredLeads();
+  if (checked) {
+    selectedLeadIds = vl.map(l => l.id || l._id);
+  } else {
+    selectedLeadIds = [];
+  }
+  renderPage();
+}
+
+async function bulkDeleteLeads() {
+  if (selectedLeadIds.length === 0) return;
+  showConfirmModal('Bulk Delete', `Are you sure you want to delete ${selectedLeadIds.length} leads?`, async () => {
+    let successCount = 0;
+    const total = selectedLeadIds.length;
+    
+    // We'll do it sequentially to keep it simple and follow current pattern
+    // In a real app we'd have a bulk endpoint
+    for (const id of selectedLeadIds) {
+      try {
+        await fetchAPI(`/leads/${id}`, { method: 'DELETE' });
+        leads = leads.filter(l => l.id !== id && l._id !== id);
+        callLogs = callLogs.filter(c => c.lead_id !== id);
+        allocationHistory = allocationHistory.filter(al => al.lead_id !== id);
+        successCount++;
+      } catch (err) {
+        console.error(`Failed to delete lead ${id}`, err);
+      }
+    }
+    
+    try {
+      await fetchAPI('/settings/allocation_history', {
+        method: 'POST',
+        body: JSON.stringify({ value: allocationHistory })
+      });
+    } catch (saveErr) {
+      console.error('Failed to save updated allocation history in bulk delete', saveErr);
+    }
+    
+    toast(`Successfully deleted ${successCount} of ${total} leads`);
+    selectedLeadIds = [];
+    renderPage();
+  });
+}
+
+function showBulkReassignModal() {
+  if (selectedLeadIds.length === 0) return;
+  const agents = getAssignableAgents();
+  
+  const html = `
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white">Bulk Reassign Leads</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('leadDetailModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="p-6">
+      <p class="text-white mb-4 font-medium">Reassigning ${selectedLeadIds.length} selected leads</p>
+      
+      <label class="block text-sm text-surface-400 mb-1.5">Assign to:</label>
+      <select class="form-input mb-4" id="reassignSelect">
+        <option value="">Unassigned</option>
+        ${agents.map(a => `<option value="${a.id}">${a.name} (${getTeam(a.team_id)?.name})</option>`).join('')}
+      </select>
+      
+      <div class="flex gap-3 mt-6">
+        <button class="btn btn-primary flex-1" onclick="handleBulkReassign()">Apply Reassignment</button>
+        <button class="btn btn-secondary flex-1" onclick="closeModal('leadDetailModal')">Cancel</button>
+      </div>
+    </div>
+  `;
+  
+  const modal = document.getElementById('leadDetailModal');
+  document.getElementById('leadDetailContent').innerHTML = html;
+  modal.classList.add('show');
+}
+
+async function handleBulkReassign() {
+  const agentId = document.getElementById('reassignSelect').value;
+  let successCount = 0;
+  const total = selectedLeadIds.length;
+  
+  for (const id of selectedLeadIds) {
+    try {
+      await fetchAPI(`/leads/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ 
+          assigned_agent_id: agentId || null,
+          assigned_at: agentId ? new Date().toISOString() : null
+        })
+      });
+      
+      const idx = leads.findIndex(l => l.id === id || l._id === id);
+      if (idx !== -1) {
+        leads[idx].assigned_agent_id = agentId || null;
+        leads[idx].assigned_at = agentId ? new Date().toISOString() : null;
+      }
+      successCount++;
+    } catch (err) {
+      console.error(`Failed to reassign lead ${id}`, err);
+    }
+  }
+  
+  toast(`Successfully reassigned ${successCount} of ${total} leads`);
+  closeModal('leadDetailModal');
+  selectedLeadIds = [];
+  renderPage();
+}
+
+function getVisibleLeads() {
+  if (APP.currentRole === 'admin') return leads;
+  if (APP.currentRole === 'tl') {
+    const tl = getUser(APP.currentUserId);
+    if (!tl) return [];
+    return leads.filter(l => {
+      const agent = getUser(l.assigned_agent_id);
+      return agent && agent.team_id === tl.team_id;
+    });
+  }
+  return leads.filter(l => l.assigned_agent_id === APP.currentUserId);
+}
+
+function getStatusBadgeClass(status) {
+  return 'badge badge-' + status.replace('_', '-');
+}
+
+function getPriorityDot(priority) {
+  return `<span class="priority-dot priority-${priority}" title="${priority}"></span>`;
+}
+
+// ========== NAVIGATION ==========
+function navigateTo(page) {
+  const isAlreadyActive = APP.currentPage === page;
+  APP.currentPage = page;
+  document.querySelectorAll('.sidebar-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
+  
+  // Show/hide team submenu
+  const submenu = document.getElementById('teamSubmenu');
+  const chevron = document.getElementById('teamChevron');
+  if (submenu) {
+    if (page === 'team') {
+      if (isAlreadyActive) {
+        const isHidden = submenu.classList.contains('hidden');
+        if (isHidden) {
+          submenu.style.display = 'flex';
+          submenu.classList.remove('hidden');
+          if (chevron) chevron.style.transform = 'rotate(180deg)';
+        } else {
+          submenu.style.display = 'none';
+          submenu.classList.add('hidden');
+          if (chevron) chevron.style.transform = 'rotate(0deg)';
+        }
+      } else {
+        submenu.style.display = 'flex';
+        submenu.classList.remove('hidden');
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+      }
+    } else {
+      submenu.style.display = 'none';
+      submenu.classList.add('hidden');
+      if (chevron) chevron.style.transform = 'rotate(0deg)';
+    }
+  }
+
+  renderPage();
+  // Close mobile sidebar
+  document.getElementById('sidebar').classList.remove('open');
+}
+
+function initSidebar() {
+  const isCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
+  const sidebar = document.getElementById('sidebar');
+  const mainContent = document.getElementById('mainContent');
+  if (sidebar && mainContent) {
+    if (isCollapsed && window.innerWidth > 1024) {
+      sidebar.classList.add('collapsed');
+      mainContent.classList.add('expanded');
+    } else {
+      sidebar.classList.remove('collapsed');
+      mainContent.classList.remove('expanded');
+    }
+  }
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const mainContent = document.getElementById('mainContent');
+  if (sidebar && mainContent) {
+    if (window.innerWidth <= 1024) {
+      sidebar.classList.toggle('open');
+      sidebar.classList.remove('collapsed');
+      mainContent.classList.remove('expanded');
+    } else {
+      sidebar.classList.toggle('collapsed');
+      mainContent.classList.toggle('expanded');
+      const isCollapsed = sidebar.classList.contains('collapsed');
+      localStorage.setItem('sidebar_collapsed', isCollapsed ? 'true' : 'false');
+    }
+  }
+}
+
+function toggleNotifications() {
+  const panel = document.getElementById('notifPanel');
+  panel.classList.toggle('hidden');
+  if (!panel.classList.contains('hidden')) {
+    // Mark all as read when opened
+    const readNotifs = JSON.parse(localStorage.getItem('read_notifications') || '[]');
+    NOTIFICATIONS.forEach(n => {
+      if (!readNotifs.includes(n.id)) {
+        readNotifs.push(n.id);
+      }
+    });
+    localStorage.setItem('read_notifications', JSON.stringify(readNotifs));
+    generateNotifications();
+    renderNotifications();
+  }
+}
+
+function showRoleSwitcher() { openModal('roleSwitcher'); }
+
+function switchRole(role) {
+  APP.currentRole = role;
+  if (role === 'admin') { APP.currentUserId = 'u1'; }
+  else if (role === 'tl') { APP.currentUserId = 'u2'; }
+  else { APP.currentUserId = 'u4'; }
+  updateUserUI();
+  closeModal('roleSwitcher');
+  navigateTo('dashboard');
+  toast(`Switched to ${role === 'admin' ? 'Admin' : role === 'tl' ? 'Team Leader' : 'Agent'} view`, 'info');
+}
+
+function updateUserUI() {
+  document.getElementById('userName').textContent = APP.userName || 'User';
+  document.getElementById('userRole').textContent = APP.currentRole === 'tl' ? 'Team Leader' : APP.currentRole === 'agent' ? 'Agent' : 'Admin';
+  document.getElementById('userAvatar').textContent = (APP.userName || 'U').charAt(0);
+  // Show/hide management nav
+  const isManager = APP.currentRole === 'admin' || APP.currentRole === 'tl';
+  document.getElementById('navTeam').style.display = isManager ? 'flex' : 'none';
+  document.getElementById('navAllocations').style.display = isManager ? 'flex' : 'none';
+  document.getElementById('navSettings').style.display = APP.currentRole === 'admin' ? 'flex' : 'none';
+  document.getElementById('manageLabel').style.display = isManager ? 'block' : 'none';
+  document.getElementById('addLeadBtn').style.display = APP.currentRole === 'agent' ? 'none' : 'inline-flex';
+  
+  // Keep team submenu in sync
+  const submenu = document.getElementById('teamSubmenu');
+  const chevron = document.getElementById('teamChevron');
+  if (submenu) {
+    if (isManager && APP.currentPage === 'team') {
+      submenu.style.display = 'flex';
+      submenu.classList.remove('hidden');
+      if (chevron) chevron.style.transform = 'rotate(180deg)';
+    } else {
+      submenu.style.display = 'none';
+      submenu.classList.add('hidden');
+      if (chevron) chevron.style.transform = 'rotate(0deg)';
+    }
+  }
+
+  // Update calling count
+  const myLeads = getVisibleLeads().filter(l => l.status !== 'disbursed' && l.status !== 'rejected' && l.status !== 'dead' && l.status !== 'not_interested');
+  document.getElementById('callingCount').textContent = myLeads.length;
+
+  // Generate real-time notifications based on loaded data
+  generateNotifications();
+}
+
+function handleGlobalSearch(q) {
+  APP.searchQuery = q.toLowerCase();
+  if (APP.currentPage === 'leads') renderPage();
+}
+
+// ========== RENDER PAGE ROUTER ==========
+function renderPage() {
+  destroyCharts();
+  const c = document.getElementById('pageContainer');
+  switch (APP.currentPage) {
+    case 'dashboard': c.innerHTML = renderDashboard(); initDashboardCharts(); break;
+    case 'leads': c.innerHTML = renderLeads(); break;
+    case 'pipeline': c.innerHTML = renderPipeline(); break;
+    case 'calling': c.innerHTML = renderCallingQueue(); break;
+    case 'workHistory': c.innerHTML = renderWorkHistory(); break;
+    case 'reports': c.innerHTML = renderReports(); break;
+    case 'team': c.innerHTML = renderTeam(); break;
+    case 'allocations': c.innerHTML = renderAllocations(); break;
+    case 'settings': c.innerHTML = renderSettings(); break;
+    default: c.innerHTML = renderDashboard(); initDashboardCharts();
+  }
+  // Animate in
+  c.querySelector('.fade-in')?.classList.add('fade-in');
+}
+
+// Initial App load
+initApp();
+
+function destroyCharts() {
+  Object.values(APP.charts).forEach(c => c.destroy());
+  APP.charts = {};
+}
+
+// ========== SETTINGS ==========
+function renderSettings() {
+  return `
+    <div class="fade-in">
+      <h2 class="font-display font-bold text-2xl text-white mb-6">Settings</h2>
+      
+      <!-- Tab Navigation -->
+      <div class="flex border-b border-surface-800 mb-6 gap-2 overflow-x-auto pb-1 scrollbar-thin">
+        <button onclick="changeSettingsTab('general')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'general' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-cog"></i> General
+        </button>
+        <button onclick="changeSettingsTab('leads')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'leads' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-filter"></i> Leads Config
+        </button>
+        <button onclick="changeSettingsTab('teams')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'teams' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-users"></i> Teams
+        </button>
+        <button onclick="changeSettingsTab('system')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'system' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-database"></i> Automation & Backup
+        </button>
+        <button onclick="changeSettingsTab('targets')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'targets' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-bullseye"></i> Targets
+        </button>
+      </div>
+
+      <div class="space-y-4 max-w-2xl">
+        ${APP.activeSettingsTab === 'general' ? `
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Appearance</h3>
+            <div class="flex items-center gap-4">
+              <button class="flex-1 p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-3 ${APP.theme === 'dark' ? 'border-brand-500 bg-brand-500/10' : 'border-surface-800 hover:border-surface-700'}" onclick="setTheme('dark')">
+                <div class="w-12 h-12 rounded-lg bg-surface-900 flex items-center justify-center text-white">
+                  <i class="fas fa-moon"></i>
+                </div>
+                <span class="font-medium ${APP.theme === 'dark' ? 'text-brand-400' : 'text-surface-400'}">Dark Mode</span>
+              </button>
+              <button class="flex-1 p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-3 ${APP.theme === 'light' ? 'border-brand-500 bg-brand-500/10' : 'border-surface-800 hover:border-surface-700'}" onclick="setTheme('light')">
+                <div class="w-12 h-12 rounded-lg bg-white border border-surface-200 flex items-center justify-center text-surface-900">
+                  <i class="fas fa-sun"></i>
+                </div>
+                <span class="font-medium ${APP.theme === 'light' ? 'text-brand-400' : 'text-surface-400'}">Light Mode</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Company Profile</h3>
+            <form onsubmit="handleCompanyProfileSubmit(event)" class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-surface-400 mb-1.5">Company Name *</label>
+                  <input type="text" class="form-input" id="cp_name" value="${COMPANY_PROFILE.name}" required placeholder="e.g. Paisaneed CRM">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-surface-400 mb-1.5">Contact Person</label>
+                  <input type="text" class="form-input" id="cp_contact_person" value="${COMPANY_PROFILE.contact_person || ''}" placeholder="e.g. John Doe">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-surface-400 mb-1.5">Email *</label>
+                  <input type="email" class="form-input" id="cp_email" value="${COMPANY_PROFILE.email}" required placeholder="support@company.com">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-surface-400 mb-1.5">Mobile *</label>
+                  <input type="text" class="form-input" id="cp_mobile" value="${COMPANY_PROFILE.mobile}" required placeholder="+91 98765 43210">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-surface-400 mb-1.5">Website</label>
+                  <input type="text" class="form-input" id="cp_website" value="${COMPANY_PROFILE.website}" placeholder="www.company.com">
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-surface-400 mb-1.5">Address</label>
+                <textarea class="form-input min-h-[80px]" id="cp_address" placeholder="Company address...">${COMPANY_PROFILE.address}</textarea>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-surface-400 mb-1.5">Other Information</label>
+                <textarea class="form-input min-h-[80px]" id="cp_other" placeholder="GSTIN, Tax ID, etc...">${COMPANY_PROFILE.other}</textarea>
+              </div>
+              <div class="flex justify-end">
+                <button type="submit" class="btn btn-primary" id="saveCompanyProfileBtn">Save Profile</button>
+              </div>
+            </form>
+          </div>
+        ` : ''}
+
+        ${APP.activeSettingsTab === 'leads' ? `
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Lead Statuses</h3>
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+              ${STATUSES.map(s => `
+                <div class="flex items-center justify-between py-2 border-b border-surface-800 last:border-0">
+                  <div class="flex items-center gap-3">
+                    <i class="fas fa-grip-vertical text-surface-600"></i>
+                    <span class="text-white">${STATUS_LABELS[s] || s} <span class="text-xs text-surface-500">(${s})</span></span>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn-ghost btn-sm text-xs" onclick="showEditLeadStatusModal('${s}')"><i class="fas fa-edit"></i></button>
+                    ${STATUSES.length > 1 ? `<button class="btn-ghost btn-sm text-xs text-rose-400" onclick="deleteLeadStatus('${s}')"><i class="fas fa-trash"></i></button>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddLeadStatusModal()"><i class="fas fa-plus"></i> Add Lead Status</button>
+          </div>
+
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Lead Priorities</h3>
+            <div class="space-y-2">
+              ${PRIORITIES.map(p => `
+                <div class="flex items-center justify-between py-2 border-b border-surface-800 last:border-0">
+                  <div class="flex items-center gap-3">
+                    <i class="fas fa-grip-vertical text-surface-600"></i>
+                    <span class="text-white">${PRIORITY_LABELS[p] || p} <span class="text-xs text-surface-500">(${p})</span></span>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn-ghost btn-sm text-xs" onclick="showEditLeadPriorityModal('${p}')"><i class="fas fa-edit"></i></button>
+                    ${PRIORITIES.length > 1 ? `<button class="btn-ghost btn-sm text-xs text-rose-400" onclick="deleteLeadPriority('${p}')"><i class="fas fa-trash"></i></button>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddLeadPriorityModal()"><i class="fas fa-plus"></i> Add Lead Priority</button>
+          </div>
+
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Lead Sources</h3>
+            <div class="flex flex-wrap gap-2">
+              ${SOURCES.map(s => `
+                <div class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-800 rounded-full text-sm text-surface-300">
+                  <span>${s.charAt(0).toUpperCase() + s.slice(1)}</span>
+                  <button class="text-xs text-surface-500 hover:text-rose-400 ml-1 focus:outline-none" onclick="deleteSource('${s}')" title="Delete Source"><i class="fas fa-times"></i></button>
+                </div>
+              `).join('')}
+            </div>
+            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddSourceModal()"><i class="fas fa-plus"></i> Add Source</button>
+          </div>
+
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Loan Types</h3>
+            <div class="space-y-2">
+              ${LOAN_TYPES.map((lt, i) => `
+                <div class="flex items-center justify-between py-2 border-b border-surface-800 last:border-0">
+                  <div class="flex items-center gap-3">
+                    <i class="fas fa-grip-vertical text-surface-600"></i>
+                    <span class="text-white">${LOAN_LABELS[lt] || lt}</span>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn-ghost btn-sm text-xs" onclick="showEditLoanTypeModal('${lt}')"><i class="fas fa-edit"></i></button>
+                    ${LOAN_TYPES.length > 1 ? `<button class="btn-ghost btn-sm text-xs text-rose-400" onclick="deleteLoanType('${lt}')"><i class="fas fa-trash"></i></button>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddLoanTypeModal()"><i class="fas fa-plus"></i> Add Loan Type</button>
+          </div>
+        ` : ''}
+
+        ${APP.activeSettingsTab === 'teams' ? `
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Teams</h3>
+            <div class="space-y-2">
+              ${TEAMS.map(t => {
+                 const teamMembers = USERS.filter(u => {
+                   const uTid = u.team_id && typeof u.team_id === 'object' ? (u.team_id._id || u.team_id.id) : u.team_id;
+                   return uTid === t.id;
+                 });
+
+                 return `
+                   <div class="flex items-center justify-between py-3 border-b border-surface-800 last:border-0">
+                     <div class="flex items-center gap-3">
+                       <div class="w-8 h-8 rounded bg-surface-800 flex items-center justify-center text-surface-400">
+                         <i class="fas fa-users text-sm"></i>
+                       </div>
+                       <div>
+                         <div class="flex items-center gap-2">
+                           <span class="font-medium text-white">${t.name}</span>
+                           <span class="text-xs text-surface-500">Leader: ${getUser(t.leader_id)?.name || 'Unassigned'}</span>
+                         </div>
+                         <div class="flex items-center gap-3 mt-1 text-[11px] text-surface-400">
+                           <span>Members: <strong class="text-white">${teamMembers.length}</strong></span>
+                         </div>
+                       </div>
+                     </div>
+                     <div class="flex gap-2">
+                       <button class="btn-ghost btn-sm text-xs" onclick="showEditTeamModal('${t.id}')" title="Edit Team"><i class="fas fa-edit"></i></button>
+                       ${TEAMS.length > 1 ? `<button class="btn-ghost btn-sm text-xs text-rose-400" onclick="deleteTeam('${t.id}')" title="Delete Team"><i class="fas fa-trash"></i></button>` : ''}
+                     </div>
+                   </div>
+                 `;
+              }).join('')}
+            </div>
+            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddTeamModal()"><i class="fas fa-plus"></i> Add Team Name</button>
+          </div>
+        ` : ''}
+
+        ${APP.activeSettingsTab === 'targets' ? `
+          <div class="card">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-display font-semibold text-white">Monthly Disbursed Amount Targets</h3>
+              <button class="btn btn-primary text-sm py-1.5" onclick="saveTargets()">Save Targets</button>
+            </div>
+            
+            <div class="space-y-6">
+              <div>
+                <h4 class="text-sm font-semibold text-surface-300 mb-3 border-b border-surface-800 pb-2">Team Targets</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  ${TEAMS.map(t => `
+                    <div>
+                      <label class="block text-xs font-medium text-surface-400 mb-1">${t.name}</label>
+                      <div class="relative">
+                        <span class="absolute left-3 top-2 text-surface-500">₹</span>
+                        <input type="number" class="form-input pl-7 target-input" data-type="team" data-id="${t.id}" value="${TARGETS.teams[t.id] || ''}" placeholder="e.g. 5000000">
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+              
+              <div>
+                <h4 class="text-sm font-semibold text-surface-300 mb-3 border-b border-surface-800 pb-2">Agent Targets</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                  ${USERS.filter(u => u.role === 'agent' && u.active).map(a => `
+                    <div>
+                      <label class="block text-xs font-medium text-surface-400 mb-1">${a.name} <span class="text-surface-600 text-[10px]">(${TEAMS.find(t=>t.id===a.team_id)?.name || 'No Team'})</span></label>
+                      <div class="relative">
+                        <span class="absolute left-3 top-2 text-surface-500">₹</span>
+                        <input type="number" class="form-input pl-7 target-input" data-type="agent" data-id="${a.id}" value="${TARGETS.agents[a.id] || ''}" placeholder="e.g. 1000000">
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+        ${APP.activeSettingsTab === 'system' ? `
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Distribution Rules</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm text-surface-400 mb-1.5">Allocation Method</label>
+                <select id="settingAllocationMethod" class="form-input w-auto">
+                  <option value="round_robin" ${DISTRIBUTION_RULES.method === 'round_robin' ? 'selected' : ''}>Round Robin</option>
+                  <option value="weighted" ${DISTRIBUTION_RULES.method === 'weighted' ? 'selected' : ''}>Weighted (by conversion rate)</option>
+                  <option value="least_load" ${DISTRIBUTION_RULES.method === 'least_load' ? 'selected' : ''}>Least Load First</option>
+                  <option value="manual" ${DISTRIBUTION_RULES.method === 'manual' ? 'selected' : ''}>Manual Only</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm text-surface-400 mb-1.5">Max Active Leads per Agent</label>
+                <input type="number" id="settingMaxLeads" class="form-input w-auto" value="${DISTRIBUTION_RULES.max_leads}" min="1">
+              </div>
+              <div>
+                <label class="block text-sm text-surface-400 mb-1.5">Lead Aging Alert (days)</label>
+                <input type="number" id="settingLeadAging" class="form-input w-auto" value="${DISTRIBUTION_RULES.aging_days}" min="1">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm mt-4" id="saveSettingsBtn" onclick="saveDistributionSettings()"><i class="fas fa-check"></i> Save Settings</button>
+          </div>
+
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Backup & Restore</h3>
+            <div class="space-y-6">
+              <div>
+                <p class="text-sm text-surface-400 mb-3">Download a complete JSON backup of all application data (Leads, Users, Teams, Settings, Call Logs).</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <label class="block text-[11px] text-surface-500 uppercase tracking-wider mb-1">Start Date (Optional)</label>
+                    <input type="date" id="backupStartDate" class="form-input text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-surface-500 uppercase tracking-wider mb-1">End Date (Optional)</label>
+                    <input type="date" id="backupEndDate" class="form-input text-sm">
+                  </div>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="backupDataJSON()">
+                  <i class="fas fa-file-export"></i> Download JSON Backup
+                </button>
+              </div>
+              
+              <div class="pt-6 border-t border-surface-800">
+                <h4 class="text-sm font-medium text-white mb-2">Restore from Backup</h4>
+                <p class="text-xs text-surface-500 mb-3">Upload a previously downloaded JSON backup file. This will replace existing data.</p>
+                <div class="flex items-center gap-3">
+                  <input type="file" id="restoreInput" accept=".json" class="hidden" onchange="handleJSONRestore(event)">
+                  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('restoreInput').click()">
+                    <i class="fas fa-file-import"></i> Select Backup File
+                  </button>
+                  <div id="restoreFileInfo" class="text-xs text-surface-400 italic"></div>
+                </div>
+                <button id="restoreConfirmBtn" class="btn btn-primary btn-sm mt-4 hidden" onclick="confirmJSONRestore()">
+                  <i class="fas fa-upload"></i> Restore Data Now
+                </button>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+async function saveDistributionSettings() {
+  const method = document.getElementById('settingAllocationMethod').value;
+  const max_leads = parseInt(document.getElementById('settingMaxLeads').value);
+  const aging_days = parseInt(document.getElementById('settingLeadAging').value);
+  
+  const btn = document.getElementById('saveSettingsBtn');
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+  
+  try {
+    const newVal = { method, max_leads, aging_days };
+    await fetchAPI('/settings/distribution_rules', {
+      method: 'POST',
+      body: JSON.stringify({ value: newVal })
+    });
+    DISTRIBUTION_RULES = newVal;
+    toast('Distribution settings saved successfully');
+  } catch (err) {
+    // Error handled by fetchAPI toast
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+// ========== MODALS & ACTIONS ==========
+function showAddMemberModal() {
+  document.getElementById('memberEditId').value = '';
+  document.getElementById('memberForm').reset();
+  document.getElementById('memberModalTitle').textContent = 'Add New Member';
+  document.getElementById('memberSubmitBtn').textContent = 'Add Member';
+  
+  // Set password field to required for new user
+  const pwdLabel = document.getElementById('memberPasswordLabel');
+  const pwdInput = document.getElementById('memberPassword');
+  if (pwdLabel && pwdInput) {
+    pwdLabel.textContent = 'Password *';
+    pwdInput.required = true;
+    pwdInput.placeholder = 'Min 6 characters (e.g. Paisa@123)';
+    pwdInput.type = 'password';
+    const eyeIcon = document.getElementById('memberPasswordEyeIcon');
+    if (eyeIcon) eyeIcon.className = 'fas fa-eye text-sm';
+  }
+
+  // Populate Team Select dynamically based on TEAMS
+  const teamSelect = document.getElementById('memberTeam');
+  teamSelect.innerHTML = '<option value="">No Team</option>' + TEAMS.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+  
+  openModal('addMemberModal');
+}
+
+function showEditMemberModal(userId) {
+  const user = getUser(userId);
+  if (!user) return;
+  document.getElementById('memberEditId').value = userId;
+  document.getElementById('memberModalTitle').textContent = 'Edit Member';
+  document.getElementById('memberSubmitBtn').textContent = 'Save Changes';
+  
+  document.getElementById('memberName').value = user.name;
+  document.getElementById('memberEmail').value = user.email;
+  document.getElementById('memberRole').value = user.role;
+  
+  // Set password field to optional for edit user
+  const pwdLabel = document.getElementById('memberPasswordLabel');
+  const pwdInput = document.getElementById('memberPassword');
+  if (pwdLabel && pwdInput) {
+    pwdLabel.textContent = 'New Password (optional)';
+    pwdInput.required = false;
+    pwdInput.placeholder = 'Leave blank to keep unchanged';
+    pwdInput.value = '';
+    pwdInput.type = 'password';
+    const eyeIcon = document.getElementById('memberPasswordEyeIcon');
+    if (eyeIcon) eyeIcon.className = 'fas fa-eye text-sm';
+  }
+
+  const teamSelect = document.getElementById('memberTeam');
+  teamSelect.innerHTML = '<option value="">No Team</option>' + TEAMS.map(t => `<option value="${t.id}" ${t.id === user.team_id ? 'selected' : ''}>${t.name}</option>`).join('');
+  
+  openModal('addMemberModal');
+}
+
+async function handleMemberSubmit(e) {
+  e.preventDefault();
+  const editId = document.getElementById('memberEditId').value;
+  const name = document.getElementById('memberName').value.trim();
+  const email = document.getElementById('memberEmail').value.trim();
+  const role = document.getElementById('memberRole').value;
+  const teamId = document.getElementById('memberTeam').value || null;
+  const password = document.getElementById('memberPassword').value.trim();
+
+  const btn = e.submitter;
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  try {
+    const payload = { name, email, role, team_id: teamId };
+    if (password) {
+      payload.password = password;
+    }
+
+    if (editId) {
+      await fetchAPI(`/users/${editId}`, { method: 'PUT', body: JSON.stringify(payload) });
+      toast('Member updated successfully');
+    } else {
+      // Check if email already exists locally first
+      const emailExists = USERS.some(u => u.email.toLowerCase() === email.toLowerCase());
+      if (emailExists) {
+        toast('A user with this email already exists', 'error');
+        return;
+      }
+      await fetchAPI('/auth/register', { method: 'POST', body: JSON.stringify(payload) });
+      toast('Member added successfully');
+    }
+
+    // Refresh users
+    const usersData = await fetchAPI('/users');
+    USERS = (usersData || []).map(u => ({ ...u, id: u._id }));
+    
+    closeModal('addMemberModal');
+    renderPage();
+    updateUserUI();
+  } catch (err) {
+    // Error handled by fetchAPI
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+function populateLoanTypeSelect(selectedId) {
+  const sel = document.getElementById('leadLoanType');
+  if (sel) {
+    sel.innerHTML = '<option value="">Select loan type</option>' + LOAN_TYPES.map(lt => `<option value="${lt}" ${lt === selectedId ? 'selected' : ''}>${LOAN_LABELS[lt] || lt}</option>`).join('');
+  }
+}
+
+function populateSourceSelect(selectedId) {
+  const sel = document.getElementById('leadSource');
+  if (sel) {
+    sel.innerHTML = SOURCES.map(s => `<option value="${s}" ${s === selectedId ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`).join('');
+  }
+}
+
+function populateStatusSelect(selectedId) {
+  const sel = document.getElementById('leadStatus');
+  if (sel) {
+    const val = selectedId || 'new';
+    sel.innerHTML = STATUSES.map(s => `<option value="${s}" ${s === val ? 'selected' : ''}>${STATUS_LABELS[s] || s}</option>`).join('');
+  }
+}
+
+function populatePrioritySelect(selectedId) {
+  const sel = document.getElementById('leadPriority');
+  if (sel) {
+    const val = selectedId || 'cold';
+    sel.innerHTML = PRIORITIES.map(p => `<option value="${p}" ${p === val ? 'selected' : ''}>${PRIORITY_LABELS[p] || p}</option>`).join('');
+  }
+}
+
+function populateCallStatusSelect(selectedId) {
+  const sel = document.getElementById('callStatusUpdate');
+  if (sel) {
+    const val = selectedId || 'new';
+    sel.innerHTML = STATUSES.map(s => `<option value="${s}" ${s === val ? 'selected' : ''}>${STATUS_LABELS[s] || s}</option>`).join('');
+  }
+}
+
+function populateCallPrioritySelect(selectedId) {
+  const sel = document.getElementById('callPriorityUpdate');
+  if (sel) {
+    const val = selectedId || 'cold';
+    sel.innerHTML = PRIORITIES.map(p => `<option value="${p}" ${p === val ? 'selected' : ''}>${PRIORITY_LABELS[p] || p}</option>`).join('');
+  }
+}
+
+function showAddLeadModal() {
+  document.getElementById('leadEditId').value = '';
+  document.getElementById('leadForm').reset();
+  document.getElementById('leadModalTitle').textContent = 'Add New Lead';
+  document.getElementById('leadSubmitBtn').textContent = 'Add Lead';
+  document.getElementById('duplicateWarning').classList.add('hidden');
+  document.getElementById('leadDeleteBtn').classList.add('hidden');
+  populateAgentSelect();
+  populateLoanTypeSelect();
+  populateSourceSelect();
+  populateStatusSelect();
+  populatePrioritySelect();
+  openModal('addLeadModal');
+}
+
+function showEditLeadModal(id) {
+  const lead = leads.find(l => l.id === id);
+  if (!lead) return;
+  document.getElementById('leadEditId').value = id;
+  document.getElementById('leadModalTitle').textContent = 'Edit Lead';
+  document.getElementById('leadSubmitBtn').textContent = 'Save Changes';
+  document.getElementById('leadName').value = lead.name;
+  document.getElementById('leadPhone').value = lead.phone;
+  document.getElementById('leadEmail').value = lead.email || '';
+  document.getElementById('leadCity').value = lead.city || '';
+  populateLoanTypeSelect(lead.loan_type);
+  document.getElementById('leadAmount').value = lead.amount_requested;
+  populateSourceSelect(lead.source);
+  populateStatusSelect(lead.status);
+  populatePrioritySelect(lead.priority);
+  document.getElementById('leadNotes').value = lead.notes || '';
+  document.getElementById('duplicateWarning').classList.add('hidden');
+  
+  const deleteBtn = document.getElementById('leadDeleteBtn');
+  if (APP.currentRole !== 'agent') {
+    deleteBtn.classList.remove('hidden');
+  } else {
+    deleteBtn.classList.add('hidden');
+  }
+  
+  populateAgentSelect(lead.assigned_agent_id);
+  openModal('addLeadModal');
+}
+
+function populateAgentSelect(selectedId) {
+  const sel = document.getElementById('leadAgent');
+  const agents = getAssignableAgents();
+  sel.innerHTML = '<option value="">Auto-assign</option>' + agents.map(a => `<option value="${a.id}" ${a.id === selectedId ? 'selected' : ''}>${a.name}</option>`).join('');
+}
+
+// --- Loan Type Modals and Actions ---
+function showAddLoanTypeModal() {
+  document.getElementById('loanTypeEditKey').value = '';
+  document.getElementById('loanTypeForm').reset();
+  document.getElementById('loanTypeKey').disabled = false;
+  document.getElementById('loanTypeModalTitle').textContent = 'Add Loan Type';
+  document.getElementById('loanTypeSubmitBtn').textContent = 'Add Loan Type';
+  openModal('addLoanTypeModal');
+}
+
+function showEditLoanTypeModal(key) {
+  const label = LOAN_LABELS[key] || key;
+  document.getElementById('loanTypeEditKey').value = key;
+  document.getElementById('loanTypeKey').value = key;
+  document.getElementById('loanTypeKey').disabled = true;
+  document.getElementById('loanTypeName').value = label;
+  document.getElementById('loanTypeModalTitle').textContent = 'Edit Loan Type';
+  document.getElementById('loanTypeSubmitBtn').textContent = 'Save Changes';
+  openModal('addLoanTypeModal');
+}
+
+async function handleLoanTypeSubmit(e) {
+  e.preventDefault();
+  const editKey = document.getElementById('loanTypeEditKey').value;
+  const key = document.getElementById('loanTypeKey').value.trim().toLowerCase().replace(/\s+/g, '_');
+  const name = document.getElementById('loanTypeName').value.trim();
+
+  if (!key) {
+    toast('Invalid loan type key', 'error');
+    return;
+  }
+
+  const btn = e.submitter;
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  try {
+    if (editKey) {
+      LOAN_LABELS[editKey] = name;
+    } else {
+      if (LOAN_TYPES.includes(key)) {
+        toast('Loan Type code already exists', 'error');
+        return;
+      }
+      LOAN_TYPES.push(key);
+      LOAN_LABELS[key] = name;
+    }
+
+    await Promise.all([
+      fetchAPI('/settings/loan_types', { method: 'POST', body: JSON.stringify({ value: LOAN_TYPES }) }),
+      fetchAPI('/settings/loan_labels', { method: 'POST', body: JSON.stringify({ value: LOAN_LABELS }) })
+    ]);
+    toast(editKey ? 'Loan Type updated successfully' : 'Loan Type added successfully');
+    closeModal('addLoanTypeModal');
+    renderPage();
+  } catch (err) {
+    // Error handled by fetchAPI
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+async function deleteLoanType(key) {
+  if (LOAN_TYPES.length <= 1) {
+    toast('Cannot delete the last remaining loan type', 'error');
+    return;
+  }
+  
+  const leadUsing = leads.some(l => l.loan_type === key);
+  if (leadUsing) {
+    toast('Cannot delete: Loan type is currently assigned to one or more leads.', 'error');
+    return;
+  }
+
+  showConfirmModal('Delete Loan Type', `Are you sure you want to delete ${LOAN_LABELS[key] || key}?`, async () => {
+    try {
+      const index = LOAN_TYPES.indexOf(key);
+      if (index > -1) {
+        LOAN_TYPES.splice(index, 1);
+        delete LOAN_LABELS[key];
+        await Promise.all([
+          fetchAPI('/settings/loan_types', { method: 'POST', body: JSON.stringify({ value: LOAN_TYPES }) }),
+          fetchAPI('/settings/loan_labels', { method: 'POST', body: JSON.stringify({ value: LOAN_LABELS }) })
+        ]);
+        toast('Loan Type deleted successfully');
+        renderPage();
+      }
+    } catch (err) {
+      initApp();
+    }
+  });
+}
+
+// --- Lead Status Modals and Actions ---
+function showAddLeadStatusModal() {
+  document.getElementById('leadStatusEditKey').value = '';
+  document.getElementById('leadStatusForm').reset();
+  document.getElementById('leadStatusKey').disabled = false;
+  document.getElementById('leadStatusModalTitle').textContent = 'Add Lead Status';
+  document.getElementById('leadStatusSubmitBtn').textContent = 'Add Lead Status';
+  openModal('addLeadStatusModal');
+}
+
+function showEditLeadStatusModal(key) {
+  const label = STATUS_LABELS[key] || key;
+  document.getElementById('leadStatusEditKey').value = key;
+  document.getElementById('leadStatusKey').value = key;
+  document.getElementById('leadStatusKey').disabled = true;
+  document.getElementById('leadStatusName').value = label;
+  document.getElementById('leadStatusModalTitle').textContent = 'Edit Lead Status';
+  document.getElementById('leadStatusSubmitBtn').textContent = 'Save Changes';
+  openModal('addLeadStatusModal');
+}
+
+async function handleLeadStatusSubmit(e) {
+  e.preventDefault();
+  const editKey = document.getElementById('leadStatusEditKey').value;
+  const key = document.getElementById('leadStatusKey').value.trim().toLowerCase().replace(/\s+/g, '_');
+  const name = document.getElementById('leadStatusName').value.trim();
+
+  if (!key) {
+    toast('Invalid status key', 'error');
+    return;
+  }
+
+  const btn = e.submitter;
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  try {
+    if (editKey) {
+      STATUS_LABELS[editKey] = name;
+    } else {
+      if (STATUSES.includes(key)) {
+        toast('Lead Status code already exists', 'error');
+        return;
+      }
+      STATUSES.push(key);
+      STATUS_LABELS[key] = name;
+    }
+
+    await Promise.all([
+      fetchAPI('/settings/lead_statuses', { method: 'POST', body: JSON.stringify({ value: STATUSES }) }),
+      fetchAPI('/settings/lead_status_labels', { method: 'POST', body: JSON.stringify({ value: STATUS_LABELS }) })
+    ]);
+    toast(editKey ? 'Lead Status updated successfully' : 'Lead Status added successfully');
+    closeModal('addLeadStatusModal');
+    renderPage();
+  } catch (err) {
+    // Handled by fetchAPI
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+async function deleteLeadStatus(key) {
+  if (STATUSES.length <= 1) {
+    toast('Cannot delete the last remaining lead status', 'error');
+    return;
+  }
+
+  const leadUsing = leads.some(l => (l.status || 'new').toLowerCase().trim() === key.toLowerCase().trim());
+  if (leadUsing) {
+    toast('Cannot delete: Status is currently assigned to one or more leads.', 'error');
+    return;
+  }
+
+  showConfirmModal('Delete Lead Status', `Are you sure you want to delete ${STATUS_LABELS[key] || key}?`, async () => {
+    try {
+      const index = STATUSES.indexOf(key);
+      if (index > -1) {
+        STATUSES.splice(index, 1);
+        delete STATUS_LABELS[key];
+        await Promise.all([
+          fetchAPI('/settings/lead_statuses', { method: 'POST', body: JSON.stringify({ value: STATUSES }) }),
+          fetchAPI('/settings/lead_status_labels', { method: 'POST', body: JSON.stringify({ value: STATUS_LABELS }) })
+        ]);
+        toast('Lead Status deleted successfully');
+        renderPage();
+      }
+    } catch (err) {
+      initApp();
+    }
+  });
+}
+
+// --- Lead Priority Modals and Actions ---
+function showAddLeadPriorityModal() {
+  document.getElementById('leadPriorityEditKey').value = '';
+  document.getElementById('leadPriorityForm').reset();
+  document.getElementById('leadPriorityKey').disabled = false;
+  document.getElementById('leadPriorityModalTitle').textContent = 'Add Lead Priority';
+  document.getElementById('leadPrioritySubmitBtn').textContent = 'Add Lead Priority';
+  openModal('addLeadPriorityModal');
+}
+
+function showEditLeadPriorityModal(key) {
+  const label = PRIORITY_LABELS[key] || key;
+  document.getElementById('leadPriorityEditKey').value = key;
+  document.getElementById('leadPriorityKey').value = key;
+  document.getElementById('leadPriorityKey').disabled = true;
+  document.getElementById('leadPriorityName').value = label;
+  document.getElementById('leadPriorityModalTitle').textContent = 'Edit Lead Priority';
+  document.getElementById('leadPrioritySubmitBtn').textContent = 'Save Changes';
+  openModal('addLeadPriorityModal');
+}
+
+async function handleLeadPrioritySubmit(e) {
+  e.preventDefault();
+  const editKey = document.getElementById('leadPriorityEditKey').value;
+  const key = document.getElementById('leadPriorityKey').value.trim().toLowerCase().replace(/\s+/g, '_');
+  const name = document.getElementById('leadPriorityName').value.trim();
+
+  if (!key) {
+    toast('Invalid priority key', 'error');
+    return;
+  }
+
+  const btn = e.submitter;
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  try {
+    if (editKey) {
+      PRIORITY_LABELS[editKey] = name;
+    } else {
+      if (PRIORITIES.includes(key)) {
+        toast('Lead Priority code already exists', 'error');
+        return;
+      }
+      PRIORITIES.push(key);
+      PRIORITY_LABELS[key] = name;
+    }
+
+    await Promise.all([
+      fetchAPI('/settings/lead_priorities', { method: 'POST', body: JSON.stringify({ value: PRIORITIES }) }),
+      fetchAPI('/settings/lead_priority_labels', { method: 'POST', body: JSON.stringify({ value: PRIORITY_LABELS }) })
+    ]);
+    toast(editKey ? 'Lead Priority updated successfully' : 'Lead Priority added successfully');
+    closeModal('addLeadPriorityModal');
+    renderPage();
+  } catch (err) {
+    // Handled by fetchAPI
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+async function deleteLeadPriority(key) {
+  if (PRIORITIES.length <= 1) {
+    toast('Cannot delete the last remaining lead priority', 'error');
+    return;
+  }
+
+  const leadUsing = leads.some(l => (l.priority || 'cold').toLowerCase().trim() === key.toLowerCase().trim());
+  if (leadUsing) {
+    toast('Cannot delete: Priority is currently assigned to one or more leads.', 'error');
+    return;
+  }
+
+  showConfirmModal('Delete Lead Priority', `Are you sure you want to delete ${PRIORITY_LABELS[key] || key}?`, async () => {
+    try {
+      const index = PRIORITIES.indexOf(key);
+      if (index > -1) {
+        PRIORITIES.splice(index, 1);
+        delete PRIORITY_LABELS[key];
+        await Promise.all([
+          fetchAPI('/settings/lead_priorities', { method: 'POST', body: JSON.stringify({ value: PRIORITIES }) }),
+          fetchAPI('/settings/lead_priority_labels', { method: 'POST', body: JSON.stringify({ value: PRIORITY_LABELS }) })
+        ]);
+        toast('Lead Priority deleted successfully');
+        renderPage();
+      }
+    } catch (err) {
+      initApp();
+    }
+  });
+}
+
+async function handleCompanyProfileSubmit(e) {
+  e.preventDefault();
+  const btn = document.getElementById('saveCompanyProfileBtn');
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  const newProfile = {
+    name: document.getElementById('cp_name').value,
+    contact_person: document.getElementById('cp_contact_person').value,
+    email: document.getElementById('cp_email').value,
+    mobile: document.getElementById('cp_mobile').value,
+    website: document.getElementById('cp_website').value,
+    address: document.getElementById('cp_address').value,
+    other: document.getElementById('cp_other').value
+  };
+
+  try {
+    const savedProfile = await fetchAPI('/settings/company_profile', { 
+      method: 'POST', 
+      body: JSON.stringify({ value: newProfile }) 
+    });
+    if (savedProfile) {
+      COMPANY_PROFILE = { ...COMPANY_PROFILE, ...newProfile };
+      toast('Company Profile updated successfully');
+    }
+  } catch (err) {
+    console.error('Error saving company profile:', err);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+// --- Lead Source Modals and Actions ---
+function showAddSourceModal() {
+  document.getElementById('sourceEditKey').value = '';
+  document.getElementById('sourceForm').reset();
+  document.getElementById('sourceModalTitle').textContent = 'Add Lead Source';
+  document.getElementById('sourceSubmitBtn').textContent = 'Add Source';
+  openModal('addSourceModal');
+}
+
+async function handleSourceSubmit(e) {
+  e.preventDefault();
+  const key = document.getElementById('sourceKey').value.trim().toLowerCase().replace(/\s+/g, '_');
+
+  if (!key) {
+    toast('Invalid source key', 'error');
+    return;
+  }
+
+  if (SOURCES.includes(key)) {
+    toast('Lead source already exists', 'error');
+    return;
+  }
+
+  const btn = e.submitter;
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  try {
+    SOURCES.push(key);
+    await fetchAPI('/settings/sources', { method: 'POST', body: JSON.stringify({ value: SOURCES }) });
+    toast('Lead Source added successfully');
+    closeModal('addSourceModal');
+    renderPage();
+  } catch (err) {
+    SOURCES.pop();
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+async function deleteSource(key) {
+  if (SOURCES.length <= 1) {
+    toast('Cannot delete the last remaining lead source', 'error');
+    return;
+  }
+
+  const leadUsing = leads.some(l => l.source === key);
+  if (leadUsing) {
+    toast('Cannot delete: Lead source is currently assigned to one or more leads.', 'error');
+    return;
+  }
+  
+  showConfirmModal('Delete Source', `Are you sure you want to delete ${key}?`, async () => {
+    try {
+      const index = SOURCES.indexOf(key);
+      if (index > -1) {
+        SOURCES.splice(index, 1);
+        await fetchAPI('/settings/sources', { method: 'POST', body: JSON.stringify({ value: SOURCES }) });
+        toast('Lead Source deleted successfully');
+        renderPage();
+      }
+    } catch (err) {
+      initApp();
+    }
+  });
+}
+
+// --- Team Modals and Actions ---
+function showAddTeamModal() {
+  document.getElementById('teamEditId').value = '';
+  document.getElementById('teamForm').reset();
+  document.getElementById('teamModalTitle').textContent = 'Add Team Name';
+  document.getElementById('teamSubmitBtn').textContent = 'Add Team Name';
+  
+  // Populate Team Leader dropdown
+  const tlSelect = document.getElementById('teamLeaderSelect');
+  const tls = USERS.filter(u => u.role === 'tl');
+  tlSelect.innerHTML = '<option value="">Unassigned</option>' + tls.map(tl => `<option value="${tl.id}">${tl.name}</option>`).join('');
+  
+  openModal('addTeamModal');
+}
+
+function showEditTeamModal(id) {
+  const team = getTeam(id);
+  if (!team) return;
+  document.getElementById('teamEditId').value = id;
+  document.getElementById('teamModalTitle').textContent = 'Edit Team Name';
+  document.getElementById('teamSubmitBtn').textContent = 'Save Changes';
+  
+  document.getElementById('teamNameInput').value = team.name;
+  
+  // Populate Team Leader dropdown
+  const tlSelect = document.getElementById('teamLeaderSelect');
+  const tls = USERS.filter(u => u.role === 'tl');
+  const currentLeaderId = team.leader_id && typeof team.leader_id === 'object' ? (team.leader_id._id || team.leader_id.id) : team.leader_id;
+  tlSelect.innerHTML = '<option value="">Unassigned</option>' + tls.map(tl => `<option value="${tl.id}" ${tl.id === currentLeaderId ? 'selected' : ''}>${tl.name}</option>`).join('');
+  
+  openModal('addTeamModal');
+}
+
+async function handleTeamSubmit(e) {
+  e.preventDefault();
+  const editId = document.getElementById('teamEditId').value;
+  const name = document.getElementById('teamNameInput').value.trim();
+  const leaderId = document.getElementById('teamLeaderSelect').value || null;
+
+  if (!name) {
+    toast('Team name is required', 'error');
+    return;
+  }
+
+  const btn = e.submitter;
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  try {
+    const payload = { name, leader_id: leaderId };
+    let result;
+    if (editId) {
+      result = await fetchAPI(`/teams/${editId}`, { method: 'PUT', body: JSON.stringify(payload) });
+      toast('Team updated successfully');
+    } else {
+      result = await fetchAPI('/teams', { method: 'POST', body: JSON.stringify(payload) });
+      toast('Team added successfully');
+    }
+
+    // Refresh teams
+    const teamsData = await fetchAPI('/teams');
+    TEAMS = (teamsData || []).map(t => ({ ...t, id: t._id }));
+    
+    closeModal('addTeamModal');
+    renderPage();
+    updateUserUI();
+  } catch (err) {
+    // Error handled by fetchAPI
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+async function deleteTeam(id) {
+  if (TEAMS.length <= 1) {
+    toast('Cannot delete the last remaining team', 'error');
+    return;
+  }
+  
+  const hasUsers = USERS.some(u => u.team_id === id);
+  const msg = hasUsers 
+    ? 'This team currently has members assigned to it. Are you sure you want to delete it? Members will be set to no team.'
+    : 'Are you sure you want to delete this team?';
+    
+  showConfirmModal('Delete Team', msg, async () => {
+    try {
+      await fetchAPI(`/teams/${id}`, { method: 'DELETE' });
+      toast('Team deleted successfully');
+      
+      // Refresh teams
+      const teamsData = await fetchAPI('/teams');
+      TEAMS = (teamsData || []).map(t => ({ ...t, id: t._id }));
+      
+      renderPage();
+      updateUserUI();
+    } catch (err) {
+      // Error handled by fetchAPI
+    }
+  });
+}
+
+async function handleLeadSubmit(e) {
+  e.preventDefault();
+  const editId = document.getElementById('leadEditId').value;
+  const name = document.getElementById('leadName').value.trim();
+  const phone = document.getElementById('leadPhone').value.trim();
+  const email = document.getElementById('leadEmail').value.trim();
+  const city = document.getElementById('leadCity').value.trim();
+  const loanType = document.getElementById('leadLoanType').value;
+  const amount = parseInt(document.getElementById('leadAmount').value);
+  const source = document.getElementById('leadSource').value;
+  const status = document.getElementById('leadStatus').value;
+  const priority = document.getElementById('leadPriority').value;
+  const notes = document.getElementById('leadNotes').value.trim();
+  const agentId = document.getElementById('leadAgent').value;
+
+  // Client-side validation: Phone number format
+  const phoneRegex = /^\+?[0-9\s\-()]{10,15}$/;
+  if (!phoneRegex.test(phone)) {
+    toast('Please enter a valid phone number (minimum 10 digits, e.g. 9876543210)', 'error');
+    return;
+  }
+  const digitsOnly = phone.replace(/[^0-9]/g, '');
+  if (digitsOnly.length < 10 || digitsOnly.length > 15) {
+    toast('Phone number must contain between 10 and 15 digits', 'error');
+    return;
+  }
+
+  // Client-side validation: Email format (only validate if provided)
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast('Please enter a valid email address (e.g., name@example.com)', 'error');
+      return;
+    }
+  }
+
+  const btn = e.submitter;
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  try {
+    const payload = {
+      name, phone, email, city,
+      loan_type: loanType,
+      amount_requested: amount,
+      source, status, priority, notes,
+      assigned_agent_id: agentId || null
+    };
+
+    let result;
+    if (editId) {
+      const oldLead = leads.find(l => l.id === editId || l._id === editId);
+      const oldAgentId = oldLead ? (oldLead.assigned_agent_id && typeof oldLead.assigned_agent_id === 'object' ? (oldLead.assigned_agent_id._id || oldLead.assigned_agent_id.id) : oldLead.assigned_agent_id) : null;
+      const targetAgentId = agentId || null;
+
+      result = await fetchAPI(`/leads/${editId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      toast('Lead updated successfully');
+
+      if (oldAgentId !== targetAgentId) {
+        await addAllocationEvent(editId, oldAgentId, targetAgentId);
+      }
+    } else {
+      result = await fetchAPI('/leads', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      toast('Lead added successfully');
+
+      if (agentId) {
+        await addAllocationEvent(result._id || result.id, null, agentId);
+      }
+    }
+
+    // Refresh leads list
+    const leadsData = await fetchAPI('/leads');
+    setLeads(leadsData);
+    
+    closeModal('addLeadModal');
+    renderPage();
+    updateUserUI();
+  } catch (err) {
+    // Error handled by fetchAPI toast
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+// Phone/Email duplicate detection on input
+document.addEventListener('input', function(e) {
+  if (e.target.id === 'leadPhone' || e.target.id === 'leadEmail') {
+    const phone = document.getElementById('leadPhone').value.trim();
+    const email = document.getElementById('leadEmail').value.trim();
+    const editId = document.getElementById('leadEditId').value;
+    
+    let dup = null;
+    let matchType = '';
+    
+    if (phone && phone.length >= 10) {
+      dup = leads.find(l => l.phone === phone && (!editId || (l.id !== editId && l._id !== editId)));
+      if (dup) matchType = 'Phone';
+    }
+    
+    if (!dup && email && email.length > 5) {
+      dup = leads.find(l => (l.email && l.email.toLowerCase() === email.toLowerCase()) && (!editId || (l.id !== editId && l._id !== editId)));
+      if (dup) matchType = 'Email';
+    }
+
+    if (dup) {
+      document.getElementById('duplicateWarning').classList.remove('hidden');
+      document.getElementById('duplicateMsg').textContent = `Duplicate ${matchType} detected: ${dup.name} (${STATUS_LABELS[dup.status]}, ${LOAN_LABELS[dup.loan_type] || dup.loan_type}, ${formatDate(dup.created_at)})`;
+    } else {
+      document.getElementById('duplicateWarning').classList.add('hidden');
+    }
+  }
+});
+
+function formatDuration(startIso, endIso) {
+  if (!startIso) return '—';
+  const start = new Date(startIso);
+  const end = endIso ? new Date(endIso) : new Date();
+  const diffTime = Math.max(0, end - start);
+  
+  const diffMinutes = Math.floor(diffTime / (1000 * 60));
+  if (diffMinutes < 60) {
+    return `${diffMinutes} mins`;
+  }
+  const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+  if (diffHours < 24) {
+    const mins = diffMinutes % 60;
+    return `${diffHours} hrs ${mins} mins`;
+  }
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const hrs = diffHours % 24;
+  return `${diffDays} days ${hrs} hrs`;
+}
+
+async function showLeadLifecycle(id) {
+  const lead = leads.find(l => l.id === id || l._id === id);
+  if (!lead) return;
+
+  // Show modal with loading state
+  document.getElementById('leadLifecycleContent').innerHTML = `
+    <div class="p-12 text-center">
+      <i class="fas fa-spinner fa-spin text-4xl text-brand-500 mb-4"></i>
+      <p class="text-surface-400">Loading lifecycle data...</p>
+    </div>
+  `;
+  openModal('leadLifecycleModal');
+
+  try {
+    // Fetch call logs
+    const calls = await fetchAPI(`/calls/${lead.id || lead._id}`);
+    const agent = getUser(lead.assigned_agent_id);
+
+    // Timeline calculations
+    const startIso = lead.created_at;
+    const isTerminal = ['disbursed', 'rejected', 'dead', 'not_interested'].includes(lead.status);
+    const endIso = isTerminal ? lead.updated_at || lead.created_at : null;
+    const totalDuration = formatDuration(startIso, endIso);
+
+    // Build timeline items
+    const timeline = [];
+
+    // 1. Lead Created
+    timeline.push({
+      title: 'Lead Created',
+      time: startIso,
+      badge: 'Start',
+      badgeClass: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
+      icon: 'fa-plus-circle text-blue-400',
+      description: `Lead created with priority <strong>${lead.priority || 'cold'}</strong> via <strong>${lead.source || 'Direct'}</strong>.`,
+      durationFromStart: '0 mins'
+    });
+
+    // 2. Lead Assigned (if assigned_at exists)
+    if (lead.assigned_at) {
+      timeline.push({
+        title: 'Assigned to Agent',
+        time: lead.assigned_at,
+        badge: 'Assigned',
+        badgeClass: 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
+        icon: 'fa-user-check text-purple-400',
+        description: `Assigned to agent <strong>${agent?.name || 'Unknown Agent'}</strong>.`,
+        durationFromStart: formatDuration(startIso, lead.assigned_at)
+      });
+    }
+
+    // 3. Call Logs (sorted chronologically)
+    if (calls && calls.length > 0) {
+      const sortedCalls = [...calls].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      sortedCalls.forEach((c, index) => {
+        timeline.push({
+          title: `Call Interaction #${index + 1}`,
+          time: c.created_at,
+          badge: c.outcome.toUpperCase().replace('_', ' '),
+          badgeClass: c.outcome === 'answered' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-surface-700 text-surface-400',
+          icon: 'fa-phone text-brand-400',
+          description: `Outcome: <strong>${c.outcome.replace('_', ' ')}</strong>. Note: <em>"${c.notes || 'No call notes'}"</em>${c.follow_up_at ? `<br/><span class="text-xs text-amber-400 font-medium"><i class="fas fa-clock mr-1"></i>Follow-up set: ${formatDateTime(c.follow_up_at)}</span>` : ''}`,
+          durationFromStart: formatDuration(startIso, c.created_at)
+        });
+      });
+    }
+
+    // 4. Current State or Completed State
+    timeline.push({
+      title: isTerminal ? 'Lifecycle Ended' : 'Current Milestone',
+      time: lead.updated_at || new Date().toISOString(),
+      badge: STATUS_LABELS[lead.status] || lead.status || 'Active',
+      badgeClass: getStatusBadgeClass(lead.status),
+      icon: isTerminal ? 'fa-check-double text-emerald-400' : 'fa-clock text-amber-400',
+      description: `Currently in <strong>${STATUS_LABELS[lead.status] || lead.status}</strong> status.`,
+      durationFromStart: formatDuration(startIso, lead.updated_at || new Date().toISOString())
+    });
+
+    // Sort timeline items by date/time to show proper sequence
+    timeline.sort((a, b) => new Date(a.time) - new Date(b.time));
+
+    document.getElementById('leadLifecycleContent').innerHTML = `
+      <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-emerald-600/20 flex items-center justify-center">
+            <i class="fas fa-history text-emerald-400 text-lg"></i>
+          </div>
+          <div>
+            <h3 class="font-display font-bold text-lg text-white">Lead Life Cycle</h3>
+            <p class="text-sm text-surface-400">${lead.name} — ${LOAN_LABELS[lead.loan_type] || lead.loan_type}</p>
+          </div>
+        </div>
+        <button class="btn-ghost rounded-lg" onclick="closeModal('leadLifecycleModal')"><i class="fas fa-times"></i></button>
+      </div>
+
+      <div class="p-6 max-h-[75vh] overflow-y-auto">
+        <!-- Overview Card -->
+        <div class="grid grid-cols-2 gap-4 bg-surface-900/40 p-4 rounded-xl border border-surface-800 mb-6">
+          <div>
+            <span class="text-[10px] uppercase font-bold text-surface-500 tracking-wider">Status Duration</span>
+            <p class="text-white font-medium text-base mt-0.5">${totalDuration}</p>
+            <span class="text-xs text-surface-400">${isTerminal ? 'From creation to resolution' : 'From creation to present'}</span>
+          </div>
+          <div>
+            <span class="text-[10px] uppercase font-bold text-surface-500 tracking-wider">Current State</span>
+            <p class="mt-0.5"><span class="${getStatusBadgeClass(lead.status || 'new')}">${STATUS_LABELS[lead.status] || lead.status || '—'}</span></p>
+            <span class="text-xs text-surface-400">Last updated: ${formatDateTime(lead.updated_at || lead.created_at)}</span>
+          </div>
+        </div>
+
+        <!-- Vertical Timeline -->
+        <div class="relative pl-6 border-l-2 border-surface-800 space-y-6 ml-3">
+          ${timeline.map((t, index) => `
+            <div class="relative">
+              <!-- Dot Indicator -->
+              <span class="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-surface-900 border-2 border-surface-700 flex items-center justify-center z-10">
+                <i class="fas ${t.icon.split(' ')[0]} ${t.icon.split(' ')[1]} text-[8px]"></i>
+              </span>
+              
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div>
+                  <span class="text-xs font-semibold text-brand-400 uppercase tracking-wider">${t.durationFromStart} from start</span>
+                  <h4 class="text-white font-semibold text-sm mt-0.5">${t.title}</h4>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold ${t.badgeClass}">${t.badge}</span>
+                  <span class="text-xs text-surface-500">${formatDateTime(t.time)}</span>
+                </div>
+              </div>
+              <p class="text-sm text-surface-300 mt-1.5 leading-relaxed">${t.description}</p>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      
+      <div class="p-6 border-t border-surface-800 flex justify-end">
+        <button class="btn btn-secondary" onclick="closeModal('leadLifecycleModal')">Close</button>
+      </div>
+    `;
+
+  } catch (err) {
+    console.error('Show lead lifecycle error:', err);
+    document.getElementById('leadLifecycleContent').innerHTML = `
+      <div class="p-8 text-center text-red-500">
+        <i class="fas fa-exclamation-triangle text-3xl mb-2"></i>
+        <p>Failed to load lead lifecycle details. Please try again.</p>
+      </div>
+    `;
+  }
+}
+
+function showCallLogModal(leadId) {
+  const lead = leads.find(l => l.id === leadId);
+  if (!lead) return;
+  document.getElementById('callLeadId').value = leadId;
+  document.getElementById('callLeadName').textContent = lead.name;
+  document.getElementById('callLeadPhone').textContent = lead.phone + ' — ' + (LOAN_LABELS[lead.loan_type] || lead.loan_type) + ' — ' + formatCurrency(lead.amount_requested);
+  document.getElementById('callOutcome').value = '';
+  populateCallStatusSelect((lead.status || 'new').toLowerCase().trim());
+  populateCallPrioritySelect((lead.priority || 'cold').toLowerCase().trim());
+  document.getElementById('callNotes').value = '';
+  document.getElementById('callFollowUp').value = '';
+  openModal('callLogModal');
+}
+
+async function handleCallLogSubmit(e) {
+  e.preventDefault();
+  const leadId = document.getElementById('callLeadId').value;
+  const outcome = document.getElementById('callOutcome').value;
+  const statusUpdate = document.getElementById('callStatusUpdate').value;
+  const priorityUpdate = document.getElementById('callPriorityUpdate').value;
+  const notes = document.getElementById('callNotes').value.trim();
+  const followUp = document.getElementById('callFollowUp').value;
+
+  const btn = e.submitter;
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  try {
+    await fetchAPI('/calls', {
+      method: 'POST',
+      body: JSON.stringify({
+        lead_id: leadId,
+        outcome,
+        notes,
+        follow_up_at: followUp || null,
+        new_status: statusUpdate || null,
+        new_priority: priorityUpdate || null
+      })
+    });
+
+    toast('Call logged successfully');
+    
+    // Refresh leads to get updated status
+    const [leadsData, callsData] = await Promise.all([
+      fetchAPI('/leads'),
+      fetchAPI('/calls').catch(() => [])
+    ]);
+    setLeads(leadsData);
+    callLogs = (Array.isArray(callsData) ? callsData : []).filter(c => 
+      leads.some(l => l.id === c.lead_id || l._id === c.lead_id)
+    );
+    
+    closeModal('callLogModal');
+    renderPage();
+    updateUserUI();
+  } catch (err) {
+    // Error handled by fetchAPI toast
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+async function showLeadDetail(id) {
+  const lead = leads.find(l => l.id === id || l._id === id);
+  if (!lead) return;
+  
+  // Show modal with loading state for calls
+  document.getElementById('leadDetailContent').innerHTML = `
+    <div class="p-12 text-center">
+      <i class="fas fa-spinner fa-spin text-4xl text-brand-500 mb-4"></i>
+      <p class="text-surface-400">Loading details...</p>
+    </div>
+  `;
+  openModal('leadDetailModal');
+
+  try {
+    const calls = await fetchAPI(`/calls/${lead.id || lead._id}`);
+    const agent = getUser(lead.assigned_agent_id);
+    const canManage = APP.currentRole !== 'agent';
+
+    document.getElementById('leadDetailContent').innerHTML = `
+      <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-full bg-brand-600/20 flex items-center justify-center"><span class="text-lg font-bold text-brand-400">${lead.name.charAt(0)}</span></div>
+          <div>
+            <h3 class="font-display font-bold text-lg text-white">${lead.name}</h3>
+            <p class="text-sm text-surface-400">${lead.city} — ${LOAN_LABELS[lead.loan_type] || lead.loan_type}</p>
+          </div>
+        </div>
+        <button class="btn-ghost rounded-lg" onclick="closeModal('leadDetailModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="p-6">
+        <!-- Info grid -->
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+          <div><p class="text-xs text-surface-500 mb-1">Phone</p><p class="text-white font-medium">${lead.phone}</p></div>
+          <div><p class="text-xs text-surface-500 mb-1">Email</p><p class="text-white font-medium">${lead.email || '—'}</p></div>
+          <div><p class="text-xs text-surface-500 mb-1">Amount</p><p class="text-white font-medium text-lg">${formatCurrency(lead.amount_requested)}</p></div>
+          <div><p class="text-xs text-surface-500 mb-1">Source</p><p class="text-white font-medium">${lead.source}</p></div>
+          <div><p class="text-xs text-surface-500 mb-1">Status</p><span class="${getStatusBadgeClass(lead.status || 'new')}">${STATUS_LABELS[lead.status] || lead.status || '—'}</span></div>
+          <div><p class="text-xs text-surface-500 mb-1">Assigned To</p><p class="text-white font-medium">${agent?.name || 'Unassigned'}</p></div>
+          <div><p class="text-xs text-surface-500 mb-1">Priority</p>${getPriorityDot(lead.priority || 'cold')} <span class="text-white capitalize">${lead.priority || 'cold'}</span></div>
+          <div><p class="text-xs text-surface-500 mb-1">Created</p><p class="text-white font-medium">${formatDateTime(lead.created_at)}</p></div>
+          <div><p class="text-xs text-surface-500 mb-1">Aging</p><p class="text-white font-medium">${getAging(lead.assigned_at)}</p></div>
+        </div>
+
+
+        ${lead.notes ? `<div class="mb-6"><p class="text-xs text-surface-500 mb-1">Notes</p><p class="text-sm text-surface-300">${lead.notes}</p></div>` : ''}
+
+        <!-- Call history -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="font-display font-semibold text-white">Call History (${calls ? calls.length : 0})</h4>
+            <button class="btn btn-primary btn-sm" onclick="closeModal('leadDetailModal');showCallLogModal('${lead.id || lead._id}')"><i class="fas fa-phone-alt"></i> Log Call</button>
+          </div>
+          ${!calls || calls.length === 0 ? '<p class="text-surface-500 text-sm py-4 text-center">No calls logged yet</p>' : `
+            <div class="space-y-3 max-h-64 overflow-y-auto">
+              ${calls.map(c => `
+                <div class="bg-surface-800/50 rounded-lg p-3">
+                  <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center gap-2">
+                      <i class="fas fa-phone-alt text-xs ${c.outcome === 'answered' ? 'text-brand-400' : 'text-surface-500'}"></i>
+                      <span class="text-sm text-white font-medium capitalize">${c.outcome.replace('_',' ')}</span>
+                    </div>
+                    <span class="text-xs text-surface-500">${formatDateTime(c.created_at)}</span>
+                  </div>
+                  ${c.notes ? `<p class="text-sm text-surface-400 mt-1">${c.notes}</p>` : ''}
+                  ${c.follow_up_at ? `<p class="text-xs text-amber-400 mt-1"><i class="fas fa-clock mr-1"></i>Follow-up: ${formatDateTime(c.follow_up_at)}</p>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+
+        ${canManage ? `
+          <div class="mt-6 pt-4 border-t border-surface-800">
+            <h4 class="font-display font-semibold text-white mb-3">Quick Actions</h4>
+            <div class="flex flex-wrap gap-2">
+              <button class="btn btn-sm text-white bg-blue-600 hover:bg-blue-700" onclick="showEditLeadModal('${lead.id || lead._id}');closeModal('leadDetailModal')"><i class="fas fa-edit"></i> Edit Lead</button>
+              <button class="btn btn-sm text-white bg-yellow-600 hover:bg-yellow-700" onclick="showReassignModal('${lead.id || lead._id}')"><i class="fas fa-exchange-alt"></i> Reassign</button>
+              <button class="btn btn-sm text-white bg-red-600 hover:bg-red-700" onclick="quickStatusChange('${lead.id || lead._id}', 'rejected')"><i class="fas fa-times"></i> Reject</button>
+              <button class="btn btn-sm text-white bg-green-600 hover:bg-green-700" onclick="quickStatusChange('${lead.id || lead._id}', 'not_interested')"><i class="fas fa-user-slash"></i> Not Interested</button>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  } catch (err) {
+    console.error('Show lead detail error:', err);
+  }
+}
+
+function quickStatusChange(leadId, newStatus) {
+  const lead = leads.find(l => l.id === leadId);
+  lead.status = newStatus;
+  lead.updated_at = new Date().toISOString();
+  toast(`Status updated to ${STATUS_LABELS[newStatus]}`);
+  closeModal('leadDetailModal');
+  renderPage();
+}
+
+async function deleteLead(id) {
+  const lead = leads.find(l => l.id === id || l._id === id);
+  if (!lead) {
+    toast('Lead not found locally', 'error');
+    return false;
+  }
+  
+  try {
+    await fetchAPI(`/leads/${id}`, { method: 'DELETE' });
+    toast('Lead deleted successfully');
+    leads = leads.filter(l => l.id !== id && l._id !== id);
+    callLogs = callLogs.filter(c => c.lead_id !== id);
+    allocationHistory = allocationHistory.filter(al => al.lead_id !== id);
+    try {
+      await fetchAPI('/settings/allocation_history', {
+        method: 'POST',
+        body: JSON.stringify({ value: allocationHistory })
+      });
+    } catch (saveErr) {
+      console.error('Failed to update allocation history after lead deletion', saveErr);
+    }
+    renderPage();
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+async function handleModalDelete() {
+  const id = document.getElementById('leadEditId').value;
+  if (!id) return;
+  const lead = leads.find(l => l.id === id || l._id === id);
+  if (!lead) return;
+
+  showConfirmModal('Delete Lead', `Are you sure you want to delete lead: ${lead.name}?`, async () => {
+    const success = await deleteLead(id);
+    if (success) {
+      closeModal('addLeadModal');
+    }
+  });
+}
+
+function showReassignModal(leadId) {
+  const lead = leads.find(l => l.id === leadId);
+  if (!lead) return;
+  const agents = getAssignableAgents();
+  // Create a simple inline reassign using a prompt-like approach but in-modal
+  const html = `
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white">Reassign Lead</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('leadDetailModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="p-6">
+      <p class="text-white mb-1 font-medium">${lead.name}</p>
+      <p class="text-sm text-surface-400 mb-4">Currently assigned to: ${getUser(lead.assigned_agent_id)?.name || 'Unassigned'}</p>
+      <label class="block text-sm text-surface-400 mb-1.5">Reassign to:</label>
+      <select class="form-input mb-4" id="reassignSelect">
+        ${agents.map(a => `<option value="${a.id}" ${a.id === lead.assigned_agent_id ? 'selected' : ''}>${a.name} (${getTeam(a.team_id)?.name})</option>`).join('')}
+      </select>
+      <div class="flex justify-end gap-2">
+        <button class="btn btn-secondary" onclick="closeModal('leadDetailModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="reassignLead('${leadId}', document.getElementById('reassignSelect').value); closeModal('leadDetailModal')">Reassign</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('leadDetailContent').innerHTML = html;
+  openModal('leadDetailModal');
+}
+
+// ========== CSV IMPORT ==========
+let importData = [];
+
+function parseCSVRow(rowText) {
+  const result = [];
+  let insideQuote = false;
+  let currentCell = '';
+  for (let i = 0; i < rowText.length; i++) {
+    const char = rowText[i];
+    if (char === '"') {
+      insideQuote = !insideQuote;
+    } else if (char === ',' && !insideQuote) {
+      result.push(currentCell.replace(/^["']|["']$/g, '').trim());
+      currentCell = '';
+    } else {
+      currentCell += char;
+    }
+  }
+  result.push(currentCell.replace(/^["']|["']$/g, '').trim());
+  return result;
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const zone = document.getElementById('csvDropZone');
+  if (zone) {
+    zone.classList.remove('border-surface-700');
+    zone.classList.add('border-brand-500', 'bg-brand-600/5');
+  }
+}
+
+function handleDragLeave(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const zone = document.getElementById('csvDropZone');
+  if (zone) {
+    zone.classList.remove('border-brand-500', 'bg-brand-600/5');
+    zone.classList.add('border-surface-700');
+  }
+}
+
+function handleCSVDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const zone = document.getElementById('csvDropZone');
+  if (zone) {
+    zone.classList.remove('border-brand-500', 'bg-brand-600/5');
+    zone.classList.add('border-surface-700');
+  }
+  
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    const file = e.dataTransfer.files[0];
+    if (file.name.toLowerCase().endsWith('.csv')) {
+      const input = document.getElementById('csvInput');
+      try {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+      } catch (err) {
+        console.error('DataTransfer assignment failed:', err);
+      }
+      const mockEvent = { target: { files: [file] } };
+      handleCSVImport(mockEvent);
+    } else {
+      toast('Please upload a valid CSV file', 'error');
+    }
+  }
+}
+
+function handleCSVImport(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const text = ev.target.result;
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) { toast('CSV file is empty or has no data rows', 'error'); return; }
+    
+    // Parse header row and validate
+    const rawHeaders = parseCSVRow(lines[0]);
+    const headers = rawHeaders.map(h => h.trim().toLowerCase().replace(/[^a-z]/g, ''));
+    const required = ['name', 'phone'];
+    const missing = required.filter(r => !headers.includes(r));
+    if (missing.length > 0) {
+      toast('Missing required columns: ' + missing.join(', '), 'error');
+      return;
+    }
+    
+    importData = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCSVRow(lines[i]);
+      if (cols.length < 2) continue;
+      const row = {};
+      headers.forEach((h, idx) => { row[h] = cols[idx] || ''; });
+      importData.push(row);
+    }
+    
+    document.getElementById('importCount').textContent = importData.length;
+    document.getElementById('importPreview').classList.remove('hidden');
+    document.getElementById('importTable').innerHTML = `
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Phone</th><th>City</th><th>Email</th><th>Status</th><th>Loan Type</th><th>Amount</th><th>Source</th></tr></thead>
+        <tbody>${importData.slice(0, 10).map(r => `<tr>
+          <td class="text-white">${r.name || '—'}</td>
+          <td>${r.phone || '—'}</td>
+          <td>${r.city || '—'}</td>
+          <td>${r.email || '—'}</td>
+          <td>${r.status || '—'}</td>
+          <td>${r.loantype || '—'}</td>
+          <td>${r.amount ? formatCurrency(r.amount) : '—'}</td>
+          <td>${r.source || '—'}</td>
+        </tr>`).join('')}${importData.length > 10 ? `<tr><td colspan="8" class="text-center text-surface-500">...and ${importData.length - 10} more</td></tr>` : ''}</tbody>
+      </table>
+    `;
+  };
+  reader.readAsText(file);
+}
+
+async function confirmImport() {
+  if (importData.length === 0) return;
+  performImport(false);
+}
+
+async function performImport(confirm) {
+  try {
+    const res = await fetchAPI('/leads/import', {
+      method: 'POST',
+      body: JSON.stringify({ leads: importData, confirm })
+    });
+
+    if (res.status === 'duplicate_found') {
+      const modal = document.getElementById('confirmModal');
+      modal.querySelector('.p-6').innerHTML = `
+        <div class="flex items-center gap-4 mb-4">
+          <div class="w-12 h-12 rounded-full bg-amber-600/20 flex items-center justify-center flex-shrink-0">
+            <i class="fas fa-exclamation-triangle text-xl text-amber-400"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-lg">Duplicates Found</h3>
+            <p class="text-surface-400 text-sm">${res.duplicatesCount} leads are already in the system. Would you like to import the ${res.newLeadsCount} new leads?</p>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button class="btn-ghost" onclick="closeModal('confirmModal')">Cancel</button>
+          <button class="btn-primary bg-amber-600 hover:bg-amber-700" onclick="performImport(true); closeModal('confirmModal')">Import Only New</button>
+        </div>
+      `;
+      openModal('confirmModal');
+      return;
+    }
+    
+    toast(`${res.imported} leads imported successfully. ${res.failed} failed.`);
+    if (res.errors && res.errors.length > 0) {
+        const errorList = document.getElementById('importErrorsList');
+        errorList.innerHTML = res.errors.map(err => `<p class="text-red-400">${err}</p>`).join('');
+        openModal('importErrorsModal');
+    }
+    
+    importData = [];
+    closeModal('importModal');
+    document.getElementById('importPreview').classList.add('hidden');
+    const fileInput = document.getElementById('csvInput');
+    if (fileInput) fileInput.value = '';
+    renderPage();
+    updateUserUI();
+  } catch (err) {
+    toast('Import failed: ' + err.message, 'error');
+  }
+}
+
+// ========== EXPORT ==========
+function downloadCSVTemplate() {
+  const templateCSV = `Name,Phone,Email,City,Loan Type,Amount,Source,Status
+Aarav Sharma,9876543210,aarav.sharma@email.com,Mumbai,Home Loan,5000000,Facebook,New
+Priya Patel,9123456789,priya.patel@email.com,Delhi,Personal Loan,200000,Website,New
+Rohan Gupta,9988776655,rohan.gupta@email.com,Bangalore,Car Loan,800000,Referral,New
+Sneha Singh,9876501234,sneha.singh@email.com,Hyderabad,Business Loan,1500000,Website,New
+Amit Verma,9112233445,amit.verma@email.com,Chennai,Home Loan,3000000,Google,New
+Megha Reddy,9001122334,megha.reddy@email.com,Pune,Personal Loan,500000,Facebook,New
+Vikram Iyer,9887766554,vikram.iyer@email.com,Kolkata,Education Loan,1000000,Website,New
+Anjali Das,9776655443,anjali.das@email.com,Ahmedabad,Car Loan,700000,Google,New
+Rahul Kumar,9665544332,rahul.kumar@email.com,Jaipur,Personal Loan,300000,Referral,New
+Sonia Rao,9554433221,sonia.rao@email.com,Lucknow,Home Loan,4000000,Facebook,New`;
+
+  const blob = new Blob([templateCSV], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = 'leads_template.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function exportLeadsCSV(selectedOnly = false) {
+  const vl = selectedOnly ? leads.filter(l => selectedLeadIds.includes(l.id || l._id)) : getFilteredLeads();
+  let csv = 'Name,Phone,Email,City,Loan Type,Amount,Source,Status,Agent,Aging,Assigned At,Created At\n';
+  vl.forEach(l => {
+    const escapedName = (l.name || '').replace(/"/g, '""');
+    const escapedPhone = (l.phone || '').replace(/"/g, '""');
+    const escapedEmail = (l.email || '').replace(/"/g, '""');
+    const escapedCity = (l.city || '').replace(/"/g, '""');
+    const escapedLoanType = (LOAN_LABELS[l.loan_type] || l.loan_type || '').replace(/"/g, '""');
+    const escapedAmount = l.amount_requested || 0;
+    const escapedSource = (l.source || '').replace(/"/g, '""');
+    const escapedStatus = (STATUS_LABELS[l.status] || l.status || '').replace(/"/g, '""');
+    const escapedAgentName = (getUser(l.assigned_agent_id)?.name || '').replace(/"/g, '""');
+    const aging = getAging(l.assigned_at);
+    const assignedAt = formatDate(l.assigned_at);
+    const createdAt = formatDate(l.created_at);
+    
+    csv += `"${escapedName}","${escapedPhone}","${escapedEmail}","${escapedCity}","${escapedLoanType}","${escapedAmount}","${escapedSource}","${escapedStatus}","${escapedAgentName}","${aging}","${assignedAt}","${createdAt}"\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = 'paisaneed_leads_export.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('CSV exported successfully');
+}
+
+// ========== JSON BACKUP & RESTORE ==========
+let restoreData = null;
+
+async function backupDataJSON() {
+  const startDate = document.getElementById('backupStartDate').value;
+  const endDate = document.getElementById('backupEndDate').value;
+  let url = '/backup';
+  const params = [];
+  if (startDate) params.push(`start_date=${startDate}`);
+  if (endDate) params.push(`end_date=${endDate}`);
+  if (params.length > 0) url += '?' + params.join('&');
+
+  try {
+    const data = await fetchAPI(url);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    const dateStr = new Date().toISOString().split('T')[0];
+    a.download = `paisaneed_backup_${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast('JSON Backup exported successfully');
+  } catch (err) {
+    console.error('Backup failed:', err);
+  }
+}
+
+function handleJSONRestore(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(event) {
+    try {
+      restoreData = JSON.parse(event.target.result);
+      document.getElementById('restoreFileInfo').textContent = `File: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      document.getElementById('restoreConfirmBtn').classList.remove('hidden');
+    } catch (err) {
+      toast('Invalid JSON file', 'error');
+      restoreData = null;
+      document.getElementById('restoreFileInfo').textContent = '';
+      document.getElementById('restoreConfirmBtn').classList.add('hidden');
+    }
+  };
+  reader.readAsText(file);
+}
+
+async function confirmJSONRestore() {
+  if (!restoreData) return;
+  if (!confirm('WARNING: This will replace your existing data with the content of the backup. Are you sure you want to proceed?')) return;
+
+  const btn = document.getElementById('restoreConfirmBtn');
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Restoring...';
+
+  try {
+    await fetchAPI('/restore', {
+      method: 'POST',
+      body: JSON.stringify(restoreData)
+    });
+    toast('Data restored successfully! The app will reload.', 'success');
+    setTimeout(() => location.reload(), 2000);
+  } catch (err) {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+// ========== NOTIFICATIONS ==========
+function generateNotifications() {
+  const list = [];
+  const currentUser = getUser(APP.currentUserId);
+  const currentRole = APP.currentRole;
+  
+  // 1. Lead assignments
+  if (Array.isArray(allocationHistory)) {
+    allocationHistory.forEach(al => {
+      const isToMe = al.to_user_id === APP.currentUserId;
+      const lead = leads.find(l => l.id === al.lead_id || l._id === al.lead_id);
+      if (lead) {
+        let shouldNotify = false;
+        if (isToMe) {
+          shouldNotify = true;
+        } else if (currentRole === 'admin') {
+          shouldNotify = true;
+        } else if (currentRole === 'tl' && currentUser) {
+          const agent = getUser(al.to_user_id);
+          const tlTeamId = currentUser.team_id && typeof currentUser.team_id === 'object' ? (currentUser.team_id._id || currentUser.team_id.id) : currentUser.team_id;
+          const agentTeamId = agent && agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : (agent ? agent.team_id : null);
+          if (agentTeamId === tlTeamId) {
+            shouldNotify = true;
+          }
+        }
+
+        if (shouldNotify) {
+          list.push({
+            id: 'notif_alloc_' + al.id,
+            type: 'lead_assigned',
+            message: isToMe 
+              ? `New lead assigned to you: <strong>${lead.name}</strong> (${LOAN_LABELS[lead.loan_type] || lead.loan_type})`
+              : `Lead assigned to ${getUser(al.to_user_id)?.name || 'Agent'}: <strong>${lead.name}</strong>`,
+            time: al.created_at,
+            read: false
+          });
+        }
+      }
+    });
+  }
+
+  // 2. Follow-ups
+  if (Array.isArray(callLogs)) {
+    callLogs.forEach(c => {
+      if (c.follow_up_at) {
+        const followUpDate = new Date(c.follow_up_at);
+        const today = new Date();
+        const isToday = followUpDate.toDateString() === today.toDateString();
+        
+        if (isToday) {
+          const lead = leads.find(l => l.id === c.lead_id || l._id === c.lead_id);
+          if (lead) {
+            const isMyLead = lead.assigned_agent_id === APP.currentUserId;
+            let shouldNotify = false;
+            
+            if (isMyLead) {
+              shouldNotify = true;
+            } else if (currentRole === 'admin') {
+              shouldNotify = true;
+            } else if (currentRole === 'tl' && currentUser) {
+              const agent = getUser(lead.assigned_agent_id);
+              const tlTeamId = currentUser.team_id && typeof currentUser.team_id === 'object' ? (currentUser.team_id._id || currentUser.team_id.id) : currentUser.team_id;
+              const agentTeamId = agent && agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : (agent ? agent.team_id : null);
+              if (agentTeamId === tlTeamId) {
+                shouldNotify = true;
+              }
+            }
+
+            if (shouldNotify) {
+              list.push({
+                id: 'notif_follow_' + c._id + '_' + c.follow_up_at,
+                type: 'followup',
+                message: isMyLead
+                  ? `Follow-up due today with <strong>${lead.name}</strong>`
+                  : `Follow-up due for ${getUser(lead.assigned_agent_id)?.name || 'Agent'} with <strong>${lead.name}</strong>`,
+                time: c.follow_up_at,
+                read: false
+              });
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // 3. Conversion / Won
+  if (Array.isArray(leads)) {
+    leads.forEach(l => {
+      if (l.status === 'disbursed') {
+        const isMyLead = l.assigned_agent_id === APP.currentUserId;
+        let shouldNotify = false;
+        
+        if (isMyLead) {
+          shouldNotify = true;
+        } else if (currentRole === 'admin') {
+          shouldNotify = true;
+        } else if (currentRole === 'tl' && currentUser) {
+          const agent = getUser(l.assigned_agent_id);
+          const tlTeamId = currentUser.team_id && typeof currentUser.team_id === 'object' ? (currentUser.team_id._id || currentUser.team_id.id) : currentUser.team_id;
+          const agentTeamId = agent && agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : (agent ? agent.team_id : null);
+          if (agentTeamId === tlTeamId) {
+            shouldNotify = true;
+          }
+        }
+
+        if (shouldNotify) {
+          list.push({
+            id: 'notif_conv_' + l.id,
+            type: 'conversion',
+            message: `Lead successfully disbursed: <strong>${l.name}</strong> (Amount: ₹${l.amount_requested?.toLocaleString() || l.amount_requested})`,
+            time: l.updated_at || l.created_at,
+            read: false
+          });
+        }
+      }
+    });
+  }
+
+  // 4. Aging leads
+  const agingDays = parseInt(DISTRIBUTION_RULES.aging_days) || 3;
+  if (Array.isArray(leads)) {
+    leads.forEach(l => {
+      if (['new', 'contacted'].includes(l.status)) {
+        const updatedDate = new Date(l.updated_at || l.created_at);
+        const diffDays = Math.floor((new Date() - updatedDate) / (1000 * 60 * 60 * 24));
+        if (diffDays >= agingDays) {
+          const isMyLead = l.assigned_agent_id === APP.currentUserId;
+          let shouldNotify = false;
+          
+          if (isMyLead) {
+            shouldNotify = true;
+          } else if (currentRole === 'admin') {
+            shouldNotify = true;
+          } else if (currentRole === 'tl' && currentUser) {
+            const agent = getUser(l.assigned_agent_id);
+            const tlTeamId = currentUser.team_id && typeof currentUser.team_id === 'object' ? (currentUser.team_id._id || currentUser.team_id.id) : currentUser.team_id;
+            const agentTeamId = agent && agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : (agent ? agent.team_id : null);
+            if (agentTeamId === tlTeamId) {
+              shouldNotify = true;
+            }
+          }
+
+          if (shouldNotify) {
+            list.push({
+              id: 'notif_aging_' + l.id,
+              type: 'aging',
+              message: `Lead aging alert: <strong>${l.name}</strong> has been inactive for ${diffDays} days`,
+              time: l.updated_at || l.created_at,
+              read: false
+            });
+          }
+        }
+      }
+    });
+  }
+
+  // Sort by time descending
+  list.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+  // Retrieve read notifications list from localStorage
+  const readNotifs = JSON.parse(localStorage.getItem('read_notifications') || '[]');
+  list.forEach(n => {
+    if (readNotifs.includes(n.id)) {
+      n.read = true;
+    }
+  });
+
+  NOTIFICATIONS = list.slice(0, 50); // limit to top 50
+  
+  // Update badge dot
+  const hasUnread = NOTIFICATIONS.some(n => !n.read);
+  const dot = document.getElementById('notifDot');
+  if (dot) {
+    if (hasUnread) {
+      dot.classList.remove('hidden');
+    } else {
+      dot.classList.add('hidden');
+    }
+  }
+}
+
+function renderNotifications() {
+  const list = document.getElementById('notifList');
+  if (!list) return;
+  if (NOTIFICATIONS.length === 0) {
+    list.innerHTML = '<p class="text-surface-500 text-center py-8">No notifications</p>';
+    return;
+  }
+  list.innerHTML = NOTIFICATIONS.map(n => {
+    const iconMap = { lead_assigned: 'user-plus text-brand-400', followup: 'clock text-amber-400', aging: 'exclamation-triangle text-rose-400', conversion: 'trophy text-brand-400' };
+    const icon = iconMap[n.type] || 'bell text-surface-400';
+    return `
+      <div class="flex items-start gap-3 py-3 border-b border-surface-800 last:border-0 ${n.read ? 'opacity-60' : ''}">
+        <div class="w-8 h-8 rounded-full bg-surface-800 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-${icon} text-xs"></i></div>
+        <div class="flex-1">
+          <p class="text-sm ${n.read ? 'text-surface-400' : 'text-white'}">${n.message}</p>
+          <p class="text-xs text-surface-500 mt-0.5">${timeAgo(n.time)}</p>
+        </div>
+        ${!n.read ? '<div class="w-2 h-2 rounded-full bg-brand-400 mt-2 flex-shrink-0"></div>' : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+async function saveTargets() {
+  const inputs = document.querySelectorAll('.target-input');
+  const newTargets = { teams: {}, agents: {} };
+  
+  inputs.forEach(input => {
+    const type = input.dataset.type;
+    const id = input.dataset.id;
+    const val = input.value ? Number(input.value) : null;
+    if (val !== null) {
+      if (type === 'team') newTargets.teams[id] = val;
+      if (type === 'agent') newTargets.agents[id] = val;
+    }
+  });
+
+  TARGETS = newTargets;
+  toast('Saving targets...', 'info');
+  try {
+    await fetchAPI('/settings/targets', {
+      method: 'POST',
+      body: JSON.stringify({ value: TARGETS })
+    });
+    toast('Targets saved successfully');
+    renderPage();
+  } catch (err) {
+    console.error(err);
+    toast('Failed to save targets', 'error');
+  }
+}
+
+// ========== INIT ==========
+function init() {
+  initSidebar();
+  updateUserUI();
+  renderPage();
+  // Keyboard shortcut
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show'));
+      document.getElementById('notifPanel').classList.add('hidden');
+    }
+  });
+
+  // Drag and drop setup for CSV import
+  const dropZone = document.getElementById('csvDropZone');
+  if (dropZone) {
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('border-brand-500', 'bg-brand-600/10');
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('border-brand-500', 'bg-brand-600/10');
+      }, false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files.length > 0) {
+        const fileInput = document.getElementById('csvInput');
+        if (fileInput) {
+          fileInput.files = files;
+          const event = { target: { files: files } };
+          handleCSVImport(event);
+        }
+      }
+    }, false);
+  }
+}
+
+initTheme();
+init();
+</script>
+</body>
+</html>

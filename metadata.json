@@ -1,0 +1,8 @@
+{
+  "name": "PaisaNeed1",
+  "description": "Imported from GitHub: rohtashsharma2018-byte/PaisaNeed",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
