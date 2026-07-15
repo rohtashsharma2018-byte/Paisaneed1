@@ -141,6 +141,10 @@ app.post('/api/auth/change-password', authenticate, async (req, res) => {
 // --- LEADS ROUTES ---
 app.get('/api/leads', authenticate, async (req, res) => {
   try {
+    const { page = 1, limit = 50, sort = 'created_at', dir = 'desc', search = '', status, loanType, source, agent, aging } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+
     let query = {};
     if (req.user.role === 'agent') {
       query.assigned_agent_id = req.user.id;
@@ -149,8 +153,29 @@ app.get('/api/leads', authenticate, async (req, res) => {
       const agentIds = agentsInTeam.map(a => a._id);
       query.assigned_agent_id = { $in: agentIds };
     }
-    const leads = await Lead.find(query).sort({ created_at: -1 });
-    res.json(leads);
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    if (status) query.status = { $in: status.split(',') };
+    if (loanType) query.loan_type = { $in: loanType.split(',') };
+    if (source) query.source = { $in: source.split(',') };
+    if (agent) query.assigned_agent_id = { $in: agent.split(',') };
+    
+    // Aging filter needs calculated field or complex query - skipping for now as it's complex
+    
+    const total = await Lead.countDocuments(query);
+    const leads = await Lead.find(query)
+      .sort({ [sort]: dir === 'asc' ? 1 : -1 })
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum);
+    
+    res.json({ leads, total, page: pageNum, limit: limitNum });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

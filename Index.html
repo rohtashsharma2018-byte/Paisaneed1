@@ -896,19 +896,11 @@ body.light-theme #loginOverlay > div {
   </div>
 </div>
 
-<script src="js/dashboard.js"></script>
-<script src="js/leads.js"></script>
-<script src="js/pipeline.js"></script>
-<script src="js/calling.js"></script>
-<script src="js/history.js"></script>
-<script src="js/reports.js"></script>
-<script src="js/team.js"></script>
-<script src="js/allocations.js"></script>
-<script src="js/settings.js"></script>
 <script>
 // ========== STATE ==========
 const APP = {
   currentPage: 'dashboard',
+  currentPaginationPage: 1,
   currentRole: 'admin',
   currentUserId: null,
   userName: '',
@@ -920,6 +912,8 @@ const APP = {
   theme: localStorage.getItem('theme') || 'dark',
   activeSettingsTab: 'general'
 };
+
+let leadsFilter = { status: [], loanType: [], source: [], agent: [], aging: [], search: '', sort: 'created_at', dir: 'desc' };
 
 function setTheme(theme) {
   APP.theme = theme;
@@ -1111,8 +1105,36 @@ function handleLogout() {
   toast('Logged out successfully', 'info');
 }
 
-function setLeads(leadsData) {
-  leads = (leadsData || []).map(l => ({ ...l, id: l._id }));
+function changePage(delta) {
+  APP.currentPaginationPage += delta;
+  fetchLeads();
+}
+
+function buildLeadsUrl() {
+  const params = new URLSearchParams({
+    page: APP.currentPaginationPage,
+    limit: 50,
+    sort: leadsFilter.sort,
+    dir: leadsFilter.dir,
+    search: leadsFilter.search,
+    status: leadsFilter.status.join(','),
+    loanType: leadsFilter.loanType.join(','),
+    source: leadsFilter.source.join(','),
+    agent: leadsFilter.agent.join(','),
+  });
+  return `/leads?${params.toString()}`;
+}
+
+async function fetchLeads() {
+  const data = await fetchAPI(buildLeadsUrl());
+  setLeads(data);
+  renderPage();
+}
+
+function setLeads(data) {
+  leads = (data.leads || []).map(l => ({ ...l, id: l._id }));
+  APP.totalLeads = data.total || 0;
+  APP.currentPaginationPage = data.page || 1;
 }
 
 async function initApp() {
@@ -1141,7 +1163,7 @@ async function initApp() {
       leadStatusesData, leadStatusLabelsData, leadPrioritiesData, leadPriorityLabelsData,
       targetsData
     ] = await Promise.all([
-      fetchAPI('/leads'),
+      fetchAPI(buildLeadsUrl()),
       fetchAPI('/users'),
       fetchAPI('/teams'),
       fetchAPI('/settings/loan_types'),
@@ -1577,6 +1599,2402 @@ function destroyCharts() {
 }
 
 // ========== DASHBOARD ==========
+function renderDashboard() {
+  const vl = getVisibleLeads();
+  const totalLeads = vl.length;
+  const contacted = vl.filter(l => ['contacted','interested','documents_pending','login_done','disbursed'].includes(l.status)).length;
+  const converted = vl.filter(l => l.status === 'disbursed').length;
+  const convRate = totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(1) : 0;
+  const todayFollowups = vl.filter(l => {
+    const calls = getLeadCalls(l.id);
+    return calls.some(c => c.follow_up_at && new Date(c.follow_up_at).toDateString() === new Date().toDateString());
+  }).length;
+  const totalAmount = vl.reduce((s, l) => s + l.amount_requested, 0);
+  const hotLeads = vl.filter(l => l.priority === 'hot' && !['disbursed','rejected','dead','not_interested'].includes(l.status)).length;
+
+  // Agent leaderboard (for admin/tl)
+  let leaderboardHTML = '';
+  if (APP.currentRole !== 'agent') {
+    const agents = APP.currentRole === 'admin' ? USERS.filter(u => u.role === 'agent' && u.active) : USERS.filter(u => u.role === 'agent' && u.active && u.team_id === getUser(APP.currentUserId)?.team_id);
+    const agentStats = agents.map(a => {
+      const aLeads = leads.filter(l => l.assigned_agent_id === a.id);
+      const aConverted = aLeads.filter(l => l.status === 'disbursed').length;
+      const aCalls = new Set(callLogs.filter(c => c.agent_id === a.id).map(c => `${c.lead_id}_${new Date(c.created_at).toDateString()}`)).size;
+      const aFollowups = aLeads.filter(l => { const calls = getLeadCalls(l.id); return calls.some(c => c.follow_up_at && new Date(c.follow_up_at).toDateString() === new Date().toDateString()); }).length;
+      return { ...a, total: aLeads.length, converted: aConverted, calls: aCalls, followups: aFollowups };
+    }).sort((a, b) => b.converted - a.converted);
+
+    leaderboardHTML = `
+      <div class="card fade-in hidden">
+        <h3 class="font-display font-bold text-white mb-4">Agent Leaderboard</h3>
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead><tr><th>Agent</th><th>Team</th><th>Leads</th><th>Calls</th><th class="text-white">Converted</th><th>Follow-ups Today</th></tr></thead>
+            <tbody>
+              ${agentStats.map(a => `<tr>
+                <td><div class="flex items-center gap-2"><div class="w-7 h-7 rounded-full bg-brand-600/20 flex items-center justify-center text-xs font-bold text-brand-400">${a.name.charAt(0)}</div><span class="font-medium text-white">${a.name}</span></div></td>
+                <td class="text-surface-400">${getTeam(a.team_id)?.name || '—'}</td>
+                <td>${a.total}</td>
+                <td>${a.calls}</td>
+                <td><span class="text-white font-semibold">${a.converted}</span></td>
+                <td>${a.followups > 0 ? `<span class="badge badge-documents-pending">${a.followups}</span>` : '0'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+    // Team leaderboard
+    const teamStats = TEAMS.map(t => {
+      const teamAgents = USERS.filter(u => u.team_id === t.id && u.active);
+      const teamLeads = leads.filter(l => teamAgents.some(a => a.id === l.assigned_agent_id));
+      const teamConverted = teamLeads.filter(l => l.status === 'disbursed').length;
+      const teamCalls = new Set(callLogs.filter(c => teamAgents.some(a => a.id === c.agent_id)).map(c => `${c.lead_id}_${new Date(c.created_at).toDateString()}`)).size;
+      return { ...t, agentCount: teamAgents.length, total: teamLeads.length, converted: teamConverted, calls: teamCalls };
+    }).sort((a, b) => b.converted - a.converted);
+
+    leaderboardHTML += `
+      <div class="card fade-in mt-6 hidden">
+        <h3 class="font-display font-bold text-white mb-4">Team Leaderboard</h3>
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead><tr><th>Team</th><th>Agents</th><th>Leads</th><th>Calls</th><th class="text-white">Converted</th></tr></thead>
+            <tbody>
+              ${teamStats.map(t => `<tr>
+                <td><div class="flex items-center gap-2"><div class="w-7 h-7 rounded-full bg-sky-600/20 flex items-center justify-center text-xs font-bold text-sky-400">${t.name.charAt(0)}</div><span class="font-medium text-white">${t.name}</span></div></td>
+                <td class="text-surface-400">${t.agentCount}</td>
+                <td>${t.total}</td>
+                <td>${t.calls}</td>
+                <td><span class="text-white font-semibold">${t.converted}</span></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  // Agent personal stats
+  let personalHTML = '';
+  if (APP.currentRole === 'agent') {
+    const myCallsCount = new Set(callLogs.filter(c => c.agent_id === APP.currentUserId).map(c => `${c.lead_id}_${new Date(c.created_at).toDateString()}`)).size;
+    const myConverted = vl.filter(l => l.status === 'disbursed').length;
+    const myInterested = vl.filter(l => l.status === 'interested').length;
+    const myDocs = vl.filter(l => l.status === 'documents_pending').length;
+    personalHTML = `
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 fade-in">
+        <div class="card text-center"><p class="text-3xl font-display font-bold text-white">${myCallsCount}</p><p class="text-sm text-surface-400 mt-1">Total Calls</p></div>
+        <div class="card text-center"><p class="text-3xl font-display font-bold text-brand-400">${myInterested}</p><p class="text-sm text-surface-400 mt-1">Interested</p></div>
+        <div class="card text-center"><p class="text-3xl font-display font-bold text-amber-400">${myDocs}</p><p class="text-sm text-surface-400 mt-1">Docs Pending</p></div>
+        <div class="card text-center"><p class="text-3xl font-display font-bold text-white">${myConverted}</p><p class="text-sm text-surface-400 mt-1">Disbursed</p></div>
+      </div>`;
+  }
+
+  // Recent activity
+  const recentCalls = [...callLogs].sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 8);
+  const activityHTML = recentCalls.map(c => {
+    const lead = leads.find(l => l.id === c.lead_id);
+    const agent = getUser(c.agent_id);
+    if (!lead || !agent) return '';
+    return `<div class="flex items-start gap-3 py-3 border-b border-surface-800 last:border-0">
+      <div class="w-8 h-8 rounded-full bg-surface-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+        <i class="fas fa-phone-alt text-xs text-surface-400"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm text-white truncate"><span class="font-medium">${agent.name}</span> called <span class="font-medium">${lead.name}</span></p>
+        <p class="text-xs text-surface-500 mt-0.5">${c.outcome} — ${timeAgo(c.created_at)}</p>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Follow-ups today
+  const followupLeads = vl.filter(l => {
+    const calls = getLeadCalls(l.id);
+    return calls.some(c => c.follow_up_at && new Date(c.follow_up_at).toDateString() === new Date().toDateString());
+  }).slice(0, 5);
+  const followupHTML = followupLeads.map(l => `
+    <div class="flex items-center gap-3 py-3 border-b border-surface-800 last:border-0 cursor-pointer hover:bg-surface-800/50 -mx-2 px-2 rounded" onclick="showLeadDetail('${l.id}')">
+      <div class="w-8 h-8 rounded-full bg-amber-600/20 flex items-center justify-center flex-shrink-0"><i class="fas fa-clock text-xs text-amber-400"></i></div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm text-white font-medium truncate">${l.name}</p>
+        <p class="text-xs text-surface-500">${LOAN_LABELS[l.loan_type] || l.loan_type} — Aging: ${getAging(l.assigned_at)}</p>
+      </div>
+      <span class="${getStatusBadgeClass(l.status)}">${STATUS_LABELS[l.status]}</span>
+    </div>
+  `).join('') || '<p class="text-surface-500 text-sm py-4 text-center">No follow-ups today</p>';
+
+  // Hot leads
+  const hotLeadsList = vl.filter(l => l.priority === 'hot' && !['disbursed','rejected','dead','not_interested'].includes(l.status)).slice(0, 5);
+  const hotHTML = hotLeadsList.map(l => `
+    <div class="flex items-center gap-3 py-3 border-b border-surface-800 last:border-0 cursor-pointer hover:bg-surface-800/50 -mx-2 px-2 rounded" onclick="showLeadDetail('${l.id}')">
+      <div class="w-8 h-8 rounded-full bg-rose-600/20 flex items-center justify-center flex-shrink-0"><i class="fas fa-fire text-xs text-rose-400"></i></div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm text-white font-medium truncate">${l.name}</p>
+        <p class="text-xs text-surface-500">${LOAN_LABELS[l.loan_type] || l.loan_type} — Aging: ${getAging(l.assigned_at)}</p>
+      </div>
+      <span class="badge badge-hot">HOT</span>
+    </div>
+  `).join('') || '<p class="text-surface-500 text-sm py-4 text-center">No hot leads</p>';
+
+  return `
+    <div class="fade-in">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="font-display font-bold text-2xl text-white">Dashboard</h2>
+          <p class="text-surface-400 text-sm mt-1">${APP.currentRole === 'admin' ? 'Company-wide overview' : APP.currentRole === 'tl' ? getTeam(getUser(APP.currentUserId)?.team_id)?.name + ' team overview' : 'Your performance at a glance'}</p>
+        </div>
+        ${APP.currentRole === 'admin' ? '<button class="btn btn-secondary btn-sm" onclick="openModal(\'importModal\')"><i class="fas fa-file-import"></i> Bulk Import</button>' : ''}
+      </div>
+
+      <!-- Stat cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="card stat-card emerald">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-lg bg-brand-600/15 flex items-center justify-center"><i class="fas fa-users text-brand-400"></i></div>
+            <span class="text-sm text-surface-400">Total Leads</span>
+          </div>
+          <p class="text-3xl font-display font-bold text-white">${totalLeads}</p>
+          <p class="text-xs text-surface-500 mt-1">${formatCurrency(totalAmount)} total pipeline</p>
+        </div>
+        <div class="card stat-card sky">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-lg bg-sky-600/15 flex items-center justify-center"><i class="fas fa-phone-alt text-sky-400"></i></div>
+            <span class="text-sm text-surface-400">Contacted</span>
+          </div>
+          <p class="text-3xl font-display font-bold text-white">${contacted}</p>
+          <p class="text-xs text-surface-500 mt-1">${totalLeads > 0 ? ((contacted/totalLeads)*100).toFixed(0) : 0}% contact rate</p>
+        </div>
+        <div class="card stat-card amber">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-lg bg-amber-600/15 flex items-center justify-center"><i class="fas fa-fire text-amber-400"></i></div>
+            <span class="text-sm text-surface-400">Hot Leads</span>
+          </div>
+          <p class="text-3xl font-display font-bold text-white">${hotLeads}</p>
+          <p class="text-xs text-surface-500 mt-1">High-intent prospects</p>
+        </div>
+        <div class="card stat-card rose">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-lg bg-rose-600/15 flex items-center justify-center"><i class="fas fa-trophy text-rose-400"></i></div>
+            <span class="text-sm text-surface-400">Converted</span>
+          </div>
+          <p class="text-3xl font-display font-bold text-white">${converted}</p>
+          <p class="text-xs text-surface-500 mt-1">${convRate}% conversion rate</p>
+        </div>
+      </div>
+
+      ${personalHTML}
+
+      <!-- Charts row -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="card fade-in">
+          <h3 class="font-display font-bold text-white mb-4">Lead Funnel</h3>
+          <div style="height:280px"><canvas id="funnelChart"></canvas></div>
+        </div>
+        <div class="card fade-in">
+          <h3 class="font-display font-bold text-white mb-4">Loan Types</h3>
+          <div style="height:280px"><canvas id="loanTypeChart"></canvas></div>
+        </div>
+        <div class="card fade-in">
+          <h3 class="font-display font-bold text-white mb-4">Source Funnel</h3>
+          <div style="height:280px"><canvas id="sourceFunnelChart"></canvas></div>
+        </div>
+        <div class="card fade-in">
+          <h3 class="font-display font-bold text-white mb-4">${APP.currentRole === 'admin' ? 'Team Comparison' : APP.currentRole === 'tl' ? 'Agent Performance' : 'Lead Sources'}</h3>
+          <div style="height:280px"><canvas id="secondaryChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Bottom row -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <div class="card fade-in">
+          <h3 class="font-display font-bold text-white mb-3">Follow-ups Today <span class="text-brand-400 text-sm font-normal">(${todayFollowups})</span></h3>
+          ${followupHTML}
+        </div>
+        <div class="card fade-in">
+          <h3 class="font-display font-bold text-white mb-3">Hot Leads <span class="text-rose-400 text-sm font-normal">(${hotLeads})</span></h3>
+          ${hotHTML}
+        </div>
+        <div class="card fade-in">
+          <h3 class="font-display font-bold text-white mb-3">Recent Activity</h3>
+          ${activityHTML}
+        </div>
+      </div>
+
+      ${leaderboardHTML}
+    </div>
+  `;
+}
+
+function initReportsChart() {}
+
+function initDashboardCharts() {
+  const vl = getVisibleLeads();
+  const theme = getChartTheme();
+  // Funnel chart
+  const funnelData = STATUSES.map(s => {
+    const targetStatus = s.toString().toLowerCase().trim();
+    return vl.filter(l => (l.status || 'new').toString().toLowerCase().trim() === targetStatus).length;
+  });
+  const funnelLabels = STATUSES.map(s => STATUS_LABELS[s] || (s.charAt(0).toUpperCase() + s.slice(1)));
+  const funnelColors = ['#34d399','#38bdf8','#c084fc','#fbbf24','#60a5fa','#6ee7b7','#fb7185','#f43f5e','#a855f7'];
+
+  const ctx1 = document.getElementById('funnelChart');
+  if (ctx1) {
+    if (APP.charts.funnel) APP.charts.funnel.destroy();
+    APP.charts.funnel = new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels: funnelLabels,
+        datasets: [{ data: funnelData, backgroundColor: funnelColors, borderRadius: 6, borderSkipped: false }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: theme.gridColor }, ticks: { color: theme.tickColor } },
+          y: { grid: { display: false }, ticks: { color: theme.labelColor, font: { size: 12 } } }
+        }
+      }
+    });
+  }
+
+  // Secondary chart
+  const ctx2 = document.getElementById('secondaryChart');
+  if (ctx2) {
+    if (APP.charts.secondary) APP.charts.secondary.destroy();
+    if (APP.currentRole === 'admin') {
+      // Team comparison
+      const teamData = TEAMS.map(t => {
+        const tLeads = leads.filter(l => {
+          const agent = getUser(l.assigned_agent_id);
+          return agent && agent.team_id === t.id;
+        });
+        return { name: t.name, total: tLeads.length, converted: tLeads.filter(l => l.status === 'disbursed').length };
+      });
+      APP.charts.secondary = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: teamData.map(t => t.name),
+          datasets: [
+            { label: 'Total Leads', data: teamData.map(t => t.total), backgroundColor: theme.gridColor, borderRadius: 6, borderSkipped: false },
+            { label: 'Converted', data: teamData.map(t => t.converted), backgroundColor: '#10b981', borderRadius: 6, borderSkipped: false }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: theme.tickColor, font: { size: 12 } } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: theme.tickColor } },
+            y: { grid: { color: theme.gridColor }, ticks: { color: theme.tickColor } }
+          }
+        }
+      });
+    } else if (APP.currentRole === 'tl') {
+      // Agent performance for TL's team
+      const myTeamId = getUser(APP.currentUserId)?.team_id;
+      const myAgents = USERS.filter(u => u.role === 'agent' && u.team_id === myTeamId);
+      const agentPerfData = myAgents.map(a => {
+        const aLeads = leads.filter(l => l.assigned_agent_id === a.id);
+        const aWon = aLeads.filter(l => l.status === 'disbursed').length;
+        return { name: a.name, won: aWon };
+      }).sort((a,b) => b.won - a.won);
+
+      APP.charts.secondary = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: agentPerfData.map(a => a.name),
+          datasets: [
+            { label: 'Won Leads', data: agentPerfData.map(a => a.won), backgroundColor: '#8b5cf6', borderRadius: 6, borderSkipped: false }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: theme.tickColor } },
+            y: { grid: { color: theme.gridColor }, ticks: { color: theme.tickColor } }
+          }
+        }
+      });
+    } else {
+      // Source distribution
+      const sourceData = SOURCES.map(s => vl.filter(l => l.source === s).length);
+      const sourceColors = ['#10b981','#f59e0b','#0ea5e9','#8b5cf6','#f43f5e','#78716c'];
+      APP.charts.secondary = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+          labels: SOURCES.map(s => s.charAt(0).toUpperCase() + s.slice(1)),
+          datasets: [{ data: sourceData, backgroundColor: sourceColors, borderWidth: 0 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '65%',
+          plugins: { legend: { position: 'right', labels: { color: theme.tickColor, font: { size: 11 }, padding: 12, usePointStyle: true, pointStyleWidth: 8 } } }
+        }
+      });
+    }
+  }
+
+  // Loan Type Chart
+  const ctx3 = document.getElementById('loanTypeChart');
+  if (ctx3) {
+    if (APP.charts.loanType) APP.charts.loanType.destroy();
+    const typeCounts = {};
+    vl.forEach(l => {
+      const t = l.loan_type || 'unknown';
+      typeCounts[t] = (typeCounts[t] || 0) + 1;
+    });
+    const activeLoanTypes = Object.keys(typeCounts);
+    const loanTypeData = activeLoanTypes.map(lt => typeCounts[lt]);
+    const ltColors = ['#f43f5e', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#0ea5e9', '#ec4899', '#6366f1', '#14b8a6', '#22d3ee', '#c084fc', '#fb7185'];
+    
+    // If there is no data, add a dummy entry so chart shows something empty
+    if (loanTypeData.length === 0 || loanTypeData.reduce((a,b)=>a+b,0) === 0) {
+      activeLoanTypes.push('No Data');
+      loanTypeData.push(1);
+      ltColors.unshift('#334155');
+    }
+
+    APP.charts.loanType = new Chart(ctx3, {
+      type: 'doughnut',
+      data: {
+        labels: activeLoanTypes.map(lt => lt === 'No Data' ? 'No Data' : (LOAN_LABELS[lt] || lt)),
+        datasets: [{ data: loanTypeData, backgroundColor: ltColors.slice(0, activeLoanTypes.length), borderWidth: 0 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '65%',
+        plugins: { 
+          legend: { 
+            position: 'right', 
+            labels: { color: theme.tickColor, font: { size: 11 }, padding: 12, usePointStyle: true, pointStyleWidth: 8 } 
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                if(context.label === 'No Data') return ' 0';
+                return ' ' + context.formattedValue;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Source Funnel Chart
+  const ctx4 = document.getElementById('sourceFunnelChart');
+  if (ctx4) {
+    if (APP.charts.sourceFunnel) APP.charts.sourceFunnel.destroy();
+    
+    const sourceCounts = SOURCES.map(s => {
+      const targetSource = s.toString().toLowerCase().trim();
+      return {
+        source: s,
+        label: s.charAt(0).toUpperCase() + s.slice(1),
+        count: vl.filter(l => (l.source || '').toString().toLowerCase().trim() === targetSource).length
+      };
+    }).sort((a, b) => b.count - a.count);
+
+    const sourceLabels = sourceCounts.map(item => item.label);
+    const sourceData = sourceCounts.map(item => item.count);
+    const sourceFunnelColors = ['#0ea5e9', '#38bdf8', '#06b6d4', '#22d3ee', '#14b8a6', '#2d3748', '#475569', '#64748b'];
+
+    APP.charts.sourceFunnel = new Chart(ctx4, {
+      type: 'bar',
+      data: {
+        labels: sourceLabels,
+        datasets: [{ data: sourceData, backgroundColor: sourceFunnelColors.slice(0, sourceLabels.length), borderRadius: 6, borderSkipped: false }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: theme.gridColor }, ticks: { color: theme.tickColor } },
+          y: { grid: { display: false }, ticks: { color: theme.labelColor, font: { size: 12 } } }
+        }
+      }
+    });
+  }
+}
+
+// ========== LEADS TABLE ==========
+
+function getFilteredLeads() {
+  let vl = getVisibleLeads();
+
+  // Global Search
+  if (APP.searchQuery) {
+    vl = vl.filter(l => l.name.toLowerCase().includes(APP.searchQuery) || l.phone.includes(APP.searchQuery) || l.city.toLowerCase().includes(APP.searchQuery) || l.email.toLowerCase().includes(APP.searchQuery));
+  }
+
+  // Local Search
+  if (leadsFilter.search) {
+    const q = leadsFilter.search.toLowerCase();
+    vl = vl.filter(l => l.name.toLowerCase().includes(q) || l.phone.includes(q));
+  }
+
+  // Filters
+  if (leadsFilter.status.length > 0) vl = vl.filter(l => leadsFilter.status.includes(l.status));
+  if (leadsFilter.loanType.length > 0) vl = vl.filter(l => leadsFilter.loanType.includes(l.loan_type));
+  if (leadsFilter.source.length > 0) vl = vl.filter(l => leadsFilter.source.includes(l.source));
+  if (leadsFilter.agent.length > 0 && (APP.currentRole === 'admin' || APP.currentRole === 'tl')) vl = vl.filter(l => leadsFilter.agent.includes(l.assigned_agent_id));
+  
+  if (leadsFilter.aging.length > 0) {
+    const now = Date.now();
+    vl = vl.filter(l => {
+      if (!l.assigned_at) return false;
+      const start = new Date(l.assigned_at).getTime();
+      if (isNaN(start)) return false;
+      const days = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+      return leadsFilter.aging.includes(String(days));
+    });
+  }
+
+  // Sort
+  vl.sort((a, b) => {
+    let va = a[leadsFilter.sort], vb = b[leadsFilter.sort];
+    if (leadsFilter.sort === 'amount_requested') return leadsFilter.dir === 'asc' ? va - vb : vb - va;
+    va = String(va); vb = String(vb);
+    return leadsFilter.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+  });
+  return vl;
+}
+
+function renderLeads() {
+  const vl = getFilteredLeads();
+  const PAGE_SIZE = 50;
+  const totalPages = Math.ceil(vl.length / PAGE_SIZE) || 1;
+  if (APP.currentPaginationPage > totalPages) APP.currentPaginationPage = totalPages;
+  const start = (APP.currentPaginationPage - 1) * PAGE_SIZE;
+  const paginatedLeads = vl.slice(start, start + PAGE_SIZE);
+
+  const now = Date.now();
+  const allSelected = paginatedLeads.length > 0 && paginatedLeads.every(l => selectedLeadIds.includes(l.id || l._id));
+  
+  const uniqueAgingDays = [...new Set(vl.map(l => {
+    if (!l.assigned_at) return null;
+    const start = new Date(l.assigned_at).getTime();
+    if (isNaN(start)) return null;
+    return Math.floor((now - start) / (1000 * 60 * 60 * 24));
+  }).filter(d => d !== null))].sort((a, b) => a - b);
+  
+  const canManage = APP.currentRole !== 'agent';
+  const agents = APP.currentRole === 'admin' ? USERS.filter(u => u.role === 'agent' && u.active) : APP.currentRole === 'tl' ? USERS.filter(u => u.role === 'agent' && u.active && u.team_id === getUser(APP.currentUserId)?.team_id) : [];
+
+  return `
+    <div class="fade-in">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="font-display font-bold text-2xl text-white">Leads</h2>
+          <p id="leadsCount" class="text-surface-400 text-sm mt-1">${vl.length} leads found ${selectedLeadIds.length > 0 ? `· <span class="text-brand-400 font-semibold">${selectedLeadIds.length} selected</span>` : ''}</p>
+        </div>
+        <div class="flex gap-2">
+          ${selectedLeadIds.length > 0 ? `
+            <div class="flex items-center gap-2 bg-brand-900/20 border border-brand-800/30 p-1 rounded-lg px-2 mr-2">
+              <span class="text-xs text-brand-300 font-medium mr-1">Bulk Actions:</span>
+              <button class="btn btn-secondary btn-sm" onclick="exportLeadsCSV(true)"><i class="fas fa-download"></i> Export</button>
+              ${canManage ? `
+                <button class="btn btn-secondary btn-sm" onclick="showBulkReassignModal()"><i class="fas fa-exchange-alt"></i> Assign</button>
+                <button class="btn btn-danger btn-sm" onclick="bulkDeleteLeads()"><i class="fas fa-trash"></i> Delete</button>
+              ` : ''}
+              <button class="btn-ghost btn-sm text-surface-400" onclick="selectedLeadIds=[];renderPage()">Cancel</button>
+            </div>
+          ` : ''}
+          <button class="btn btn-secondary btn-sm" onclick="exportLeadsCSV()"><i class="fas fa-download"></i> Export CSV</button>
+           <button class="btn btn-secondary btn-sm" onclick="downloadCSVTemplate()"><i class="fas fa-file-download"></i> Download Template</button>
+           ${canManage ? `<button class="btn btn-secondary btn-sm" onclick="openModal('importModal')"><i class="fas fa-file-import"></i> Import CSV</button>` : ''}
+          <button class="btn btn-primary btn-sm" onclick="showAddLeadModal()"><i class="fas fa-plus"></i> Add Lead</button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="card mb-4">
+        <div class="flex flex-wrap gap-3">
+          <input type="text" class="form-input py-2 text-sm w-64" placeholder="Search name or phone..." value="${leadsFilter.search}" oninput="handleLeadsSearch(this.value)">
+          
+          ${renderMultiSelect('status', 'Status', [...new Set(leads.map(l => l.status || 'new'))].map(s => ({ value: s, label: STATUS_LABELS[s] || s })))}
+          ${renderMultiSelect('loanType', 'Loan Type', [...new Set(leads.map(l => l.loan_type || 'personal'))].map(s => ({ value: s, label: LOAN_LABELS[s] || s })))}
+          ${renderMultiSelect('source', 'Source', [...new Set(leads.map(l => l.source || 'website'))].map(s => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) })))}
+          
+          ${canManage ? renderMultiSelect('agent', 'Agent', agents.map(a => ({ value: a.id, label: a.name }))) : ''}
+          
+          ${renderMultiSelect('aging', 'Aging', uniqueAgingDays.map(d => ({ value: String(d), label: `${d} Days` })))}
+
+          <button class="btn btn-ghost btn-sm" onclick="leadsFilter={status:[],loanType:[],source:[],agent:[],aging:[],search:'',sort:'created_at',dir:'desc'};APP.currentPaginationPage=1;renderPage()"><i class="fas fa-times"></i> Clear</button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="card p-0 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead id="leadsTableHead">
+              <tr>
+                <th class="w-10">
+                  <input type="checkbox" class="w-4 h-4 rounded border-surface-700 bg-surface-800 text-brand-500 focus:ring-brand-500/20" 
+                    ${allSelected ? 'checked' : ''} onchange="toggleAllLeads(this.checked)">
+                </th>
+                <th class="cursor-pointer" onclick="toggleSort('name')">Name ${sortIcon('name')}</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th class="cursor-pointer" onclick="toggleSort('loan_type')">Loan Type ${sortIcon('loan_type')}</th>
+                <th class="cursor-pointer" onclick="toggleSort('amount_requested')">Amount ${sortIcon('amount_requested')}</th>
+                <th class="cursor-pointer" onclick="toggleSort('status')">Status ${sortIcon('status')}</th>
+                <th class="cursor-pointer" onclick="toggleSort('source')">Source ${sortIcon('source')}</th>
+                ${canManage ? '<th>Agent</th>' : ''}
+                <th>Aging</th>
+                <th class="cursor-pointer" onclick="toggleSort('assigned_at')">Assigned Date ${sortIcon('assigned_at')}</th>
+                <th class="cursor-pointer" onclick="toggleSort('created_at')">Created ${sortIcon('created_at')}</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="leadsTableBody">
+              ${paginatedLeads.length === 0 ? `<tr><td colspan="${canManage?12:11}" class="text-center py-12 text-surface-500">No leads found</td></tr>` :
+              paginatedLeads.map(l => renderLeadRow(l, canManage)).join('')}
+            </tbody>
+          </table>
+        </div>
+        <!-- Pagination -->
+        <div class="flex items-center justify-between p-4 border-t border-surface-800">
+            <span class="text-sm text-surface-400">Page ${APP.currentPaginationPage} of ${totalPages}</span>
+            <div class="flex gap-2">
+                <button class="btn btn-secondary btn-sm ${APP.currentPaginationPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}" 
+                    onclick="if(APP.currentPaginationPage > 1) changePage(-1)" ${APP.currentPaginationPage === 1 ? 'disabled' : ''}>Back</button>
+                <button class="btn btn-secondary btn-sm ${APP.currentPaginationPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}" 
+                    onclick="if(APP.currentPaginationPage < ${totalPages}) changePage(1)" ${APP.currentPaginationPage === totalPages ? 'disabled' : ''}>Next</button>
+            </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderLeadRow(l, canManage) {
+  const isSelected = selectedLeadIds.includes(l.id || l._id);
+  return `<tr class="${isSelected ? 'bg-brand-500/5' : ''}">
+    <td>
+      <input type="checkbox" class="w-4 h-4 rounded border-surface-700 bg-surface-800 text-brand-500 focus:ring-brand-500/20" 
+        ${isSelected ? 'checked' : ''} onchange="toggleLeadSelection('${l.id || l._id}', this.checked)">
+    </td>
+    <td>
+      <div class="flex items-center gap-2">
+        ${getPriorityDot(l.priority)}
+        <div>
+          <p class="font-medium text-white">${l.name}</p>
+          <p class="text-xs text-surface-500">${l.city}</p>
+        </div>
+      </div>
+    </td>
+    <td class="font-mono text-sm">${l.phone}</td>
+    <td class="text-sm text-surface-400 max-w-[150px] truncate" title="${l.email || ''}">${l.email || '—'}</td>
+    <td><span class="text-sm">${LOAN_LABELS[l.loan_type] || l.loan_type}</span></td>
+    <td class="font-medium text-white">${formatCurrency(l.amount_requested)}</td>
+    <td><span class="${getStatusBadgeClass(l.status || 'new')}">${STATUS_LABELS[l.status] || l.status || '—'}</span></td>
+    <td class="text-sm text-surface-400">${l.source || '—'}</td>
+    ${canManage ? `<td class="text-sm text-surface-400">${getUser(l.assigned_agent_id)?.name || 'Unassigned'}</td>` : ''}
+    <td class="text-sm">
+      <span class="text-surface-400">${getAging(l.assigned_at)}</span>
+    </td>
+    <td class="text-sm text-surface-400">${formatDate(l.assigned_at)}</td>
+    <td class="text-sm text-surface-400">${formatDate(l.created_at)}</td>
+    <td>
+      <div class="flex gap-1">
+        <button class="btn-ghost rounded text-xs text-blue-600" onclick="showLeadDetail('${l.id}')" title="View"><i class="fas fa-eye"></i></button>
+        ${APP.currentRole !== 'agent' ? `<button class="btn-ghost rounded text-xs text-red-600" onclick="showEditLeadModal('${l.id}')" title="Edit"><i class="fas fa-edit"></i></button>` : ''}
+        <button class="btn-ghost rounded text-xs text-brand-400" onclick="showCallLogModal('${l.id}')" title="Log Call"><i class="fas fa-phone-alt"></i></button>
+        ${canManage ? `<button class="btn-ghost rounded text-xs text-amber-400" onclick="showReassignModal('${l.id}')" title="Reassign"><i class="fas fa-exchange-alt"></i></button>` : ''}
+      </div>
+    </td>
+  </tr>`;
+}
+
+function handleLeadsSearch(val) {
+  APP.currentPaginationPage = 1;
+  leadsFilter.search = val;
+  fetchLeads();
+}
+
+function renderMultiSelect(key, label, options) {
+  const selected = leadsFilter[key];
+  const labelText = selected.length === 0 ? `All ${label}s` : selected.length === 1 ? options.find(o => o.value === selected[0])?.label : `${selected.length} ${label}s`;
+  
+  return `
+    <div class="relative group">
+      <button class="form-input py-2 text-sm w-auto flex items-center justify-between gap-2 min-w-[140px] text-left">
+        <span class="truncate">${labelText}</span>
+        <i class="fas fa-chevron-down text-[10px] opacity-50"></i>
+      </button>
+      <div class="absolute left-0 top-full mt-1 w-56 bg-surface-800 border border-surface-700 rounded-lg shadow-xl z-50 hidden group-hover:block max-h-64 overflow-y-auto p-1">
+        <div class="p-2 border-b border-surface-700 flex justify-between items-center">
+          <span class="text-xs font-bold text-surface-500 uppercase tracking-wider">${label}</span>
+          ${selected.length > 0 ? `<button class="text-[10px] text-brand-400 hover:underline" onclick="leadsFilter['${key}']=[];fetchLeads()">Clear</button>` : ''}
+        </div>
+        <div class="py-1">
+          ${options.map(o => `
+            <label class="flex items-center px-3 py-2 hover:bg-surface-700 rounded cursor-pointer transition-colors">
+              <input type="checkbox" class="rounded border-surface-600 text-brand-600 focus:ring-brand-500/20 bg-surface-900" 
+                ${selected.includes(o.value) ? 'checked' : ''} 
+                onchange="toggleFilterValue('${key}', '${o.value}')">
+              <span class="ml-2 text-sm text-surface-200">${o.label}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function toggleFilterValue(key, value) {
+  APP.currentPaginationPage = 1;
+  const idx = leadsFilter[key].indexOf(value);
+  if (idx === -1) {
+    leadsFilter[key].push(value);
+  } else {
+    leadsFilter[key].splice(idx, 1);
+  }
+  fetchLeads();
+}
+function sortIcon(field) {
+  if (leadsFilter.sort !== field) return '<i class="fas fa-sort text-surface-600 ml-1 text-[10px]"></i>';
+  return leadsFilter.dir === 'asc' ? '<i class="fas fa-sort-up text-brand-400 ml-1 text-[10px]"></i>' : '<i class="fas fa-sort-down text-brand-400 ml-1 text-[10px]"></i>';
+}
+
+function toggleSort(field) {
+  APP.currentPaginationPage = 1;
+  if (leadsFilter.sort === field) leadsFilter.dir = leadsFilter.dir === 'asc' ? 'desc' : 'asc';
+  else { leadsFilter.sort = field; leadsFilter.dir = 'asc'; }
+  fetchLeads();
+}
+
+// ========== PIPELINE (KANBAN) ==========
+function renderPipeline() {
+  const vl = getVisibleLeads();
+  const pipelineStatuses = ['new','contacted','interested','documents_pending','login_done','disbursed'];
+  const statusColors = { new: '#34d399', contacted: '#38bdf8', interested: '#c084fc', documents_pending: '#fbbf24', login_done: '#60a5fa', disbursed: '#6ee7b7' };
+
+  return `
+    <div class="fade-in">
+      <div class="mb-6">
+        <h2 class="font-display font-bold text-2xl text-white">Lead Pipeline</h2>
+        <p class="text-surface-400 text-sm mt-1">Drag-free kanban view of your lead pipeline</p>
+      </div>
+      <div class="flex gap-4 overflow-x-auto pb-4">
+        ${pipelineStatuses.map(s => {
+          const sLeads = vl.filter(l => {
+            const status = (l.status || 'new').toLowerCase().trim();
+            return status === s;
+          });
+          return `
+            <div class="kanban-col flex-shrink-0">
+              <div class="flex items-center gap-2 mb-3 px-1">
+                <div class="w-2.5 h-2.5 rounded-full" style="background:${statusColors[s]}"></div>
+                <span class="font-display font-semibold text-sm text-white">${STATUS_LABELS[s]}</span>
+                <span class="text-xs text-surface-500 bg-surface-800 px-2 py-0.5 rounded-full">${sLeads.length}</span>
+              </div>
+              <div class="space-y-3 min-h-[200px]">
+                ${sLeads.map(l => `
+                  <div class="kanban-card" onclick="showLeadDetail('${l.id}')">
+                    <div class="flex items-center justify-between mb-2">
+                      <p class="font-medium text-white text-sm">${l.name}</p>
+                      ${l.priority === 'hot' ? '<span class="badge badge-hot text-[10px]">HOT</span>' : ''}
+                    </div>
+                    <p class="text-xs text-surface-500 mb-2">${LOAN_LABELS[l.loan_type] || l.loan_type} — ${formatCurrency(l.amount_requested)}</p>
+                    <div class="flex items-center justify-between">
+                      <p class="text-xs text-surface-400"><i class="fas fa-map-marker-alt mr-1"></i>${l.city}</p>
+                      <p class="text-[11px] text-surface-500">${timeAgo(l.created_at)}</p>
+                    </div>
+                  </div>
+                `).join('')}
+                ${sLeads.length === 0 ? '<div class="border border-dashed border-surface-700 rounded-xl p-6 text-center text-surface-600 text-sm">No leads</div>' : ''}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ========== CALLING QUEUE ==========
+function renderCallingQueue() {
+  const vl = getVisibleLeads().filter(l => !['disbursed','rejected','dead','not_interested'].includes(l.status));
+  // Sort: follow-ups today first, then hot, then new, then others
+  vl.sort((a, b) => {
+    const aFollowup = getLeadCalls(a.id).some(c => c.follow_up_at && new Date(c.follow_up_at).toDateString() === new Date().toDateString());
+    const bFollowup = getLeadCalls(b.id).some(c => c.follow_up_at && new Date(c.follow_up_at).toDateString() === new Date().toDateString());
+    if (aFollowup && !bFollowup) return -1;
+    if (!aFollowup && bFollowup) return 1;
+    const pOrder = { hot: 0, warm: 1, cold: 2 };
+    if (pOrder[a.priority] !== pOrder[b.priority]) return pOrder[a.priority] - pOrder[b.priority];
+    const sOrder = { new: 0, contacted: 1, interested: 2, documents_pending: 3, login_done: 4 };
+    return (sOrder[a.status] || 5) - (sOrder[b.status] || 5);
+  });
+
+  return `
+    <div class="fade-in">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="font-display font-bold text-2xl text-white">Calling Queue</h2>
+          <p class="text-surface-400 text-sm mt-1">${vl.length} leads to call — prioritized by follow-ups and priority</p>
+        </div>
+      </div>
+      <div class="space-y-3">
+        ${vl.map((l, i) => {
+          const lastCall = getLeadCalls(l.id)[0];
+          const hasFollowupToday = lastCall?.follow_up_at && new Date(lastCall.follow_up_at).toDateString() === new Date().toDateString();
+          return `
+            <div class="card flex flex-col sm:flex-row items-start sm:items-center gap-4 ${hasFollowupToday ? 'glow-emerald border-amber-600/30' : ''}">
+              <div class="flex items-center gap-4 flex-1 min-w-0">
+                <div class="w-10 h-10 rounded-full ${l.priority === 'hot' ? 'bg-rose-600/20' : l.priority === 'warm' ? 'bg-amber-600/20' : 'bg-surface-800'} flex items-center justify-center flex-shrink-0">
+                  <span class="text-sm font-bold ${l.priority === 'hot' ? 'text-rose-400' : l.priority === 'warm' ? 'text-amber-400' : 'text-surface-400'}">${i + 1}</span>
+                </div>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <p class="font-semibold text-white">${l.name}</p>
+                    ${l.priority === 'hot' ? '<span class="badge badge-hot">HOT</span>' : ''}
+                    ${hasFollowupToday ? '<span class="badge badge-documents-pending">Follow-up Due</span>' : ''}
+                  </div>
+                  <p class="text-sm text-surface-400 mt-0.5">${l.phone}${l.email ? ` — ${l.email}` : ''} — ${l.city}</p>
+                  <p class="text-xs text-surface-500 mt-0.5">${LOAN_LABELS[l.loan_type] || l.loan_type} — ${formatCurrency(l.amount_requested)} — ${lastCall ? 'Last call: ' + timeAgo(lastCall.created_at) : 'No calls yet'}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span class="${getStatusBadgeClass(l.status)}">${STATUS_LABELS[l.status]}</span>
+                <button class="btn btn-primary btn-sm" onclick="showCallLogModal('${l.id}')"><i class="fas fa-phone-alt"></i> Call</button>
+                <button class="btn btn-ghost btn-sm" onclick="showLeadDetail('${l.id}')"><i class="fas fa-eye"></i></button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+        ${vl.length === 0 ? '<div class="card text-center py-16 text-surface-500"><i class="fas fa-check-circle text-4xl mb-3 text-brand-400"></i><p>All caught up! No leads to call.</p></div>' : ''}
+      </div>
+    </div>
+  `;
+}
+
+// ========== TEAM ==========
+function renderTeam() {
+  let usersToShow;
+  if (APP.currentRole === 'admin') usersToShow = USERS.filter(u => u.id !== APP.currentUserId);
+  else {
+    const tl = getUser(APP.currentUserId);
+    if (!tl) usersToShow = [];
+    else usersToShow = USERS.filter(u => u.team_id === tl.team_id);
+  }
+
+  const filterRole = APP.teamRoleFilter || 'all';
+  if (filterRole === 'tl') {
+    usersToShow = usersToShow.filter(u => u.role === 'tl');
+  } else if (filterRole === 'agent') {
+    usersToShow = usersToShow.filter(u => u.role === 'agent');
+  }
+
+  const isListMode = APP.teamViewMode === 'list';
+
+  const viewContent = isListMode ? `
+    <div class="card p-0 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th>Role</th>
+              <th>Team</th>
+              <th>Email</th>
+              <th>Leads Assigned</th>
+              <th>Calls Logged</th>
+              <th>Won Leads</th>
+              <th>Status</th>
+              ${APP.currentRole === 'admin' ? '<th class="text-right">Actions</th>' : ''}
+            </tr>
+          </thead>
+          <tbody>
+            ${usersToShow.map(u => {
+              const uLeads = leads.filter(l => l.assigned_agent_id === u.id);
+              const uConverted = uLeads.filter(l => l.status === 'disbursed').length;
+              const uCalls = new Set(callLogs.filter(c => c.agent_id === u.id).map(c => `${c.lead_id}_${new Date(c.created_at).toDateString()}`)).size;
+              const team = getTeam(u.team_id);
+              return `
+                <tr>
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <div class="w-7 h-7 rounded-full ${u.active ? 'bg-brand-600/20 text-brand-400' : 'bg-surface-800 text-surface-500'} flex items-center justify-center text-xs font-bold">
+                        ${u.name.charAt(0)}
+                      </div>
+                      <span class="font-medium text-white">${u.name}</span>
+                    </div>
+                  </td>
+                  <td class="capitalize text-sm">
+                    ${u.role === 'tl' ? '<span class="badge badge-interested">Team Leader</span>' : '<span class="badge badge-documents-pending">Agent</span>'}
+                  </td>
+                  <td class="text-surface-400 text-sm">${team ? team.name : '—'}</td>
+                  <td class="text-surface-400 text-sm">${u.email}</td>
+                  <td class="text-white text-sm font-semibold">${uLeads.length}</td>
+                  <td class="text-white text-sm font-semibold">${uCalls}</td>
+                  <td class="text-white text-sm font-semibold">${uConverted}</td>
+                  <td>
+                    <span class="badge ${u.active ? 'badge-new' : 'badge-dead'}">${u.active ? 'Active' : 'Inactive'}</span>
+                  </td>
+                  ${APP.currentRole === 'admin' ? `
+                  <td class="text-right">
+                    <div class="flex gap-1 justify-end">
+                      <button class="btn btn-ghost btn-sm text-xs" onclick="showEditMemberModal('${u.id}')" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button class="btn btn-ghost btn-sm text-xs ${u.active ? 'text-amber-400' : 'text-brand-400'}" onclick="toggleUserActive('${u.id}')" title="${u.active ? 'Deactivate' : 'Activate'}">${u.active ? '<i class="fas fa-ban"></i>' : '<i class="fas fa-check"></i>'}</button>
+                      <button class="btn btn-ghost btn-sm text-xs text-rose-400" onclick="deleteMember('${u.id}')" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>` : ''}
+                </tr>
+              `;
+            }).join('')}
+            ${usersToShow.length === 0 ? `<tr><td colspan="${APP.currentRole === 'admin' ? 9 : 8}" class="text-center py-12 text-surface-500">No members found</td></tr>` : ''}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  ` : `
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      ${usersToShow.map(u => {
+        const uLeads = leads.filter(l => l.assigned_agent_id === u.id);
+        const uConverted = uLeads.filter(l => l.status === 'disbursed').length;
+        const uCalls = new Set(callLogs.filter(c => c.agent_id === u.id).map(c => `${c.lead_id}_${new Date(c.created_at).toDateString()}`)).size;
+        const team = getTeam(u.team_id);
+        return `
+          <div class="card">
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 rounded-full ${u.active ? 'bg-brand-600/20' : 'bg-surface-800'} flex items-center justify-center flex-shrink-0">
+                <span class="text-lg font-bold ${u.active ? 'text-brand-400' : 'text-surface-500'}">${u.name.charAt(0)}</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <p class="font-semibold text-white">${u.name}</p>
+                  ${!u.active ? '<span class="badge badge-dead">Inactive</span>' : ''}
+                </div>
+                <p class="text-xs text-surface-500 capitalize">${u.role === 'tl' ? 'Team Leader' : 'Agent'} ${team ? '— ' + team.name : ''}</p>
+                <p class="text-xs text-surface-500 mt-0.5">${u.email}</p>
+                <div class="grid grid-cols-3 gap-2 mt-3">
+                  <div class="bg-surface-800/50 rounded-lg p-2 text-center">
+                    <p class="text-lg font-bold text-white">${uLeads.length}</p>
+                    <p class="text-[10px] text-surface-500">Leads</p>
+                  </div>
+                  <div class="bg-surface-800/50 rounded-lg p-2 text-center">
+                    <p class="text-lg font-bold text-white">${uCalls}</p>
+                    <p class="text-[10px] text-surface-500">Calls</p>
+                  </div>
+                  <div class="bg-surface-800/50 rounded-lg p-2 text-center">
+                    <p class="text-lg font-bold text-white">${uConverted}</p>
+                    <p class="text-[10px] text-white uppercase tracking-wider">Won</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            ${APP.currentRole === 'admin' ? `<div class="mt-3 pt-3 border-t border-surface-800 flex gap-2">
+              <button class="btn btn-ghost btn-sm text-xs" onclick="showEditMemberModal('${u.id}')"><i class="fas fa-edit"></i> Edit</button>
+              <button class="btn btn-ghost btn-sm text-xs ${u.active ? 'text-amber-400' : 'text-brand-400'}" onclick="toggleUserActive('${u.id}')">${u.active ? '<i class="fas fa-ban"></i> Deactivate' : '<i class="fas fa-check"></i> Activate'}</button>
+              <button class="btn btn-ghost btn-sm text-xs text-rose-400 ml-auto" onclick="deleteMember('${u.id}')"><i class="fas fa-trash"></i></button>
+            </div>` : ''}
+          </div>
+        `;
+      }).join('')}
+      ${usersToShow.length === 0 ? '<div class="col-span-full card text-center py-16 text-surface-500"><i class="fas fa-users-slash text-4xl mb-3 text-brand-400"></i><p>No members found in this category.</p></div>' : ''}
+    </div>
+  `;
+
+  const teamsToAggregate = APP.currentRole === 'admin' 
+    ? TEAMS 
+    : TEAMS.filter(t => {
+        const tl = getUser(APP.currentUserId);
+        const tId = t.id;
+        const tlTid = tl && tl.team_id && typeof tl.team_id === 'object' ? (tl.team_id._id || tl.team_id.id) : (tl ? tl.team_id : null);
+        return tId === tlTid;
+      });
+
+  return `
+    <div class="fade-in">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="font-display font-bold text-2xl text-white">Team Management</h2>
+          <p class="text-surface-400 text-sm mt-1">${usersToShow.length} members</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="hidden sm:flex bg-surface-900 border border-surface-800 rounded-lg p-1 text-xs gap-1">
+            <button onclick="filterTeamRole('all', event)" class="px-2.5 py-1 rounded transition-colors ${filterRole === 'all' ? 'bg-brand-600/20 text-brand-400 font-semibold' : 'text-surface-400 hover:text-white'}">All</button>
+            <button onclick="filterTeamRole('tl', event)" class="px-2.5 py-1 rounded transition-colors ${filterRole === 'tl' ? 'bg-brand-600/20 text-brand-400 font-semibold' : 'text-surface-400 hover:text-white'}">Leaders</button>
+            <button onclick="filterTeamRole('agent', event)" class="px-2.5 py-1 rounded transition-colors ${filterRole === 'agent' ? 'bg-brand-600/20 text-brand-400 font-semibold' : 'text-surface-400 hover:text-white'}">Agents</button>
+          </div>
+          <div class="hidden sm:flex bg-surface-900 border border-surface-800 rounded-lg p-1 text-xs gap-1">
+            <button onclick="setTeamView('gallery', event)" class="p-1 px-2 rounded transition-colors ${!isListMode ? 'bg-surface-800 text-brand-400' : 'text-surface-500 hover:text-white'}" title="Gallery View"><i class="fas fa-th-large"></i></button>
+            <button onclick="setTeamView('list', event)" class="p-1 px-2 rounded transition-colors ${isListMode ? 'bg-surface-800 text-brand-400' : 'text-surface-500 hover:text-white'}" title="List View"><i class="fas fa-list"></i></button>
+          </div>
+          ${APP.currentRole === 'admin' ? '<button class="btn btn-primary btn-sm" onclick="showAddMemberModal()"><i class="fas fa-plus"></i> Add Member</button>' : ''}
+        </div>
+      </div>
+      ${viewContent}
+    </div>
+  `;
+}
+
+function filterTeamRole(role, event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  APP.teamRoleFilter = role;
+  
+  // Update styling of submenu items
+  ['all', 'tl', 'agent'].forEach(r => {
+    const btn = document.getElementById(`sub_${r}`);
+    if (btn) {
+      if (r === role) {
+        btn.className = "flex items-center gap-2 py-1.5 px-3 rounded-md transition-all text-left font-medium text-brand-400 bg-brand-500/10";
+      } else {
+        btn.className = "flex items-center gap-2 py-1.5 px-3 rounded-md transition-all text-left font-medium text-surface-400 hover:text-white";
+      }
+    }
+  });
+
+  renderPage();
+}
+
+function setTeamView(view, event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  APP.teamViewMode = view;
+
+  // Update styling of view buttons
+  const btnGallery = document.getElementById('sub_view_gallery');
+  const btnList = document.getElementById('sub_view_list');
+  if (btnGallery && btnList) {
+    if (view === 'gallery') {
+      btnGallery.className = "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-md transition-all font-medium text-brand-400 bg-brand-500/10 text-[11px]";
+      btnList.className = "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-md transition-all font-medium text-surface-400 hover:text-white bg-surface-800/40 hover:bg-surface-800/70 text-[11px]";
+    } else {
+      btnGallery.className = "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-md transition-all font-medium text-surface-400 hover:text-white bg-surface-800/40 hover:bg-surface-800/70 text-[11px]";
+      btnList.className = "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-md transition-all font-medium text-brand-400 bg-brand-500/10 text-[11px]";
+    }
+  }
+
+  renderPage();
+}
+
+async function toggleUserActive(userId) {
+  const user = getUser(userId);
+  if (!user) return;
+  
+  try {
+    const newStatus = !user.active;
+    await fetchAPI(`/users/${userId}`, { method: 'PUT', body: JSON.stringify({ active: newStatus }) });
+    user.active = newStatus;
+    toast(`${user.name} ${user.active ? 'activated' : 'deactivated'}`);
+    renderPage();
+  } catch (err) {
+    // Error handled by fetchAPI
+  }
+}
+
+async function deleteMember(userId) {
+  if (userId === APP.currentUserId) {
+    toast('Cannot delete yourself', 'error');
+    return;
+  }
+
+  showConfirmModal('Delete Member', 'Are you sure you want to delete this member? This action cannot be undone.', async () => {
+    try {
+      await fetchAPI(`/users/${userId}`, { method: 'DELETE' });
+      toast('Member deleted successfully');
+      
+      // Refresh users
+      const usersData = await fetchAPI('/users');
+      USERS = (usersData || []).map(u => ({ ...u, id: u._id }));
+      
+      renderPage();
+    } catch (err) {
+      // Error handled by fetchAPI
+    }
+  });
+}
+
+// ========== ALLOCATIONS ==========
+function renderAllocations() {
+  const recentAllocs = [...allocationHistory].sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 30);
+
+  // Unassigned leads (if any)
+  const unassigned = leads.filter(l => !l.assigned_agent_id);
+
+  return `
+    <div class="fade-in">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="font-display font-bold text-2xl text-white">Allocations</h2>
+          <p class="text-surface-400 text-sm mt-1">Allocation history and lead distribution</p>
+        </div>
+        ${unassigned.length > 0 ? `<button class="btn btn-primary btn-sm" onclick="autoAllocateLeads()"><i class="fas fa-magic"></i> Auto-allocate ${unassigned.length} unassigned</button>` : ''}
+      </div>
+
+      ${unassigned.length > 0 ? `
+        <div class="card mb-4 border-amber-600/30">
+          <h3 class="font-display font-semibold text-amber-400 mb-3"><i class="fas fa-exclamation-triangle mr-2"></i>Unassigned Leads (${unassigned.length})</h3>
+          <div class="space-y-2">
+            ${unassigned.map(l => `
+              <div class="flex items-center justify-between py-2 border-b border-surface-800 last:border-0">
+                <div>
+                  <span class="text-white font-medium">${l.name}</span>
+                  <span class="text-surface-500 text-sm ml-2">${l.phone} — ${LOAN_LABELS[l.loan_type] || l.loan_type}</span>
+                </div>
+                <select class="form-input py-1.5 text-sm w-auto" onchange="reassignLead('${l.id}', this.value)">
+                  <option value="">Assign to...</option>
+                  ${getAssignableAgents().map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
+                </select>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Agent load balance -->
+      <div class="card mb-4">
+        <h3 class="font-display font-bold text-white mb-4">Agent Load Balance</h3>
+        <div class="space-y-3">
+          ${getAssignableAgents().map(a => {
+            const count = leads.filter(l => {
+              const assignedId = l.assigned_agent_id && typeof l.assigned_agent_id === 'object' ? (l.assigned_agent_id._id || l.assigned_agent_id.id) : l.assigned_agent_id;
+              return assignedId === a.id && !['disbursed','rejected','dead','not_interested'].includes(l.status);
+            }).length;
+            const max = 15;
+            const pct = Math.min(100, (count / max) * 100);
+            return `
+              <div class="flex items-center gap-4">
+                <span class="text-sm text-white w-32 truncate">${a.name}</span>
+                <div class="flex-1 h-3 bg-surface-800 rounded-full overflow-hidden">
+                  <div class="h-full rounded-full transition-all ${pct > 80 ? 'bg-rose-500' : pct > 50 ? 'bg-amber-500' : 'bg-brand-500'}" style="width:${pct}%"></div>
+                </div>
+                <span class="text-sm text-surface-400 w-16 text-right">${count} leads</span>
+              </div>
+            `;
+          }).join('')}
+          ${getAssignableAgents().length === 0 ? `<div class="text-sm text-surface-500 text-center py-4">No assignable agents found</div>` : ''}
+        </div>
+      </div>
+
+      <div class="card p-0 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead><tr><th>Lead</th><th>From</th><th>To</th><th>Allocated By</th><th>Date</th></tr></thead>
+            <tbody>
+              ${recentAllocs.map(al => {
+                const lead = leads.find(l => l.id === al.lead_id || l._id === al.lead_id);
+                const to = getUser(al.to_user_id);
+                const by = getUser(al.allocated_by);
+                return `<tr>
+                  <td class="text-white font-medium">${lead?.name || 'Unknown'}</td>
+                  <td class="text-surface-400">${al.from_user_id ? getUser(al.from_user_id)?.name || 'Unknown' : '—'}</td>
+                  <td class="text-white">${to?.name || 'Unknown'}</td>
+                  <td class="text-surface-400">${by?.name || 'System'}</td>
+                  <td class="text-surface-400 text-sm">${formatDateTime(al.created_at)}</td>
+                </tr>`;
+              }).join('')}
+              ${recentAllocs.length === 0 ? `<tr><td colspan="5" class="text-center py-8 text-surface-500">No allocation history found</td></tr>` : ''}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function getAssignableAgents() {
+  if (APP.currentRole === 'admin') return USERS.filter(u => u.role === 'agent' && u.active);
+  const tl = getUser(APP.currentUserId);
+  if (!tl) return [];
+  const tlTeamId = tl.team_id && typeof tl.team_id === 'object' ? (tl.team_id._id || tl.team_id.id) : tl.team_id;
+  return USERS.filter(u => {
+    const uTeamId = u.team_id && typeof u.team_id === 'object' ? (u.team_id._id || u.team_id.id) : u.team_id;
+    return u.role === 'agent' && u.active && uTeamId === tlTeamId;
+  });
+}
+
+async function addAllocationEvent(leadId, fromUserId, toUserId) {
+  const newEvent = {
+    id: 'a' + Date.now() + Math.random().toString(36).substr(2, 4),
+    lead_id: leadId,
+    from_user_id: fromUserId || null,
+    to_user_id: toUserId,
+    allocated_by: APP.currentUserId || 'System',
+    created_at: new Date().toISOString()
+  };
+  allocationHistory.push(newEvent);
+  try {
+    await fetchAPI('/settings/allocation_history', {
+      method: 'POST',
+      body: JSON.stringify({ value: allocationHistory })
+    });
+  } catch (err) {
+    console.error('Failed to save allocation history', err);
+  }
+}
+
+async function reassignLead(leadId, newAgentId) {
+  if (!newAgentId) return;
+  const lead = leads.find(l => l.id === leadId || l._id === leadId);
+  if (!lead) return;
+
+  const oldAgentId = lead.assigned_agent_id && typeof lead.assigned_agent_id === 'object' ? (lead.assigned_agent_id._id || lead.assigned_agent_id.id) : lead.assigned_agent_id;
+
+  try {
+    await fetchAPI(`/leads/${leadId || lead._id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ assigned_agent_id: newAgentId })
+    });
+    
+    // Refresh leads
+    await fetchLeads();
+    
+    // Log allocation
+    await addAllocationEvent(leadId || lead._id, oldAgentId, newAgentId);
+    
+    toast(`Lead reassigned to ${getUser(newAgentId).name}`);
+    updateUserUI();
+  } catch (err) {
+    // Error handled by fetchAPI
+  }
+}
+
+async function autoAllocateLeads() {
+  const unassigned = leads.filter(l => !l.assigned_agent_id);
+  const agents = getAssignableAgents();
+  if (agents.length === 0) { toast('No active agents available', 'error'); return; }
+  let idx = 0;
+  for (const l of unassigned) {
+    const agent = agents[idx % agents.length];
+    await reassignLead(l.id, agent.id);
+    idx++;
+  }
+  toast(`${unassigned.length} leads auto-allocated (round-robin)`);
+  renderPage();
+}
+
+
+
+// ========== SETTINGS ==========
+function renderSettings() {
+  return `
+    <div class="fade-in">
+      <h2 class="font-display font-bold text-2xl text-white mb-6">Settings</h2>
+      
+      <!-- Tab Navigation -->
+      <div class="flex border-b border-surface-800 mb-6 gap-2 overflow-x-auto pb-1 scrollbar-thin">
+        <button onclick="changeSettingsTab('general')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'general' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-cog"></i> General
+        </button>
+        <button onclick="changeSettingsTab('leads')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'leads' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-filter"></i> Leads Config
+        </button>
+        <button onclick="changeSettingsTab('teams')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'teams' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-users"></i> Teams
+        </button>
+        <button onclick="changeSettingsTab('system')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'system' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-database"></i> Automation & Backup
+        </button>
+        <button onclick="changeSettingsTab('targets')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'targets' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-bullseye"></i> Targets
+        </button>
+      </div>
+
+      <div class="space-y-4 max-w-2xl">
+        ${APP.activeSettingsTab === 'general' ? `
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Appearance</h3>
+            <div class="flex items-center gap-4">
+              <button class="flex-1 p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-3 ${APP.theme === 'dark' ? 'border-brand-500 bg-brand-500/10' : 'border-surface-800 hover:border-surface-700'}" onclick="setTheme('dark')">
+                <div class="w-12 h-12 rounded-lg bg-surface-900 flex items-center justify-center text-white">
+                  <i class="fas fa-moon"></i>
+                </div>
+                <span class="font-medium ${APP.theme === 'dark' ? 'text-brand-400' : 'text-surface-400'}">Dark Mode</span>
+              </button>
+              <button class="flex-1 p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-3 ${APP.theme === 'light' ? 'border-brand-500 bg-brand-500/10' : 'border-surface-800 hover:border-surface-700'}" onclick="setTheme('light')">
+                <div class="w-12 h-12 rounded-lg bg-white border border-surface-200 flex items-center justify-center text-surface-900">
+                  <i class="fas fa-sun"></i>
+                </div>
+                <span class="font-medium ${APP.theme === 'light' ? 'text-brand-400' : 'text-surface-400'}">Light Mode</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Company Profile</h3>
+            <form onsubmit="handleCompanyProfileSubmit(event)" class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-surface-400 mb-1.5">Company Name *</label>
+                  <input type="text" class="form-input" id="cp_name" value="${COMPANY_PROFILE.name}" required placeholder="e.g. Paisaneed CRM">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-surface-400 mb-1.5">Contact Person</label>
+                  <input type="text" class="form-input" id="cp_contact_person" value="${COMPANY_PROFILE.contact_person || ''}" placeholder="e.g. John Doe">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-surface-400 mb-1.5">Email *</label>
+                  <input type="email" class="form-input" id="cp_email" value="${COMPANY_PROFILE.email}" required placeholder="support@company.com">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-surface-400 mb-1.5">Mobile *</label>
+                  <input type="text" class="form-input" id="cp_mobile" value="${COMPANY_PROFILE.mobile}" required placeholder="+91 98765 43210">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-surface-400 mb-1.5">Website</label>
+                  <input type="text" class="form-input" id="cp_website" value="${COMPANY_PROFILE.website}" placeholder="www.company.com">
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-surface-400 mb-1.5">Address</label>
+                <textarea class="form-input min-h-[80px]" id="cp_address" placeholder="Company address...">${COMPANY_PROFILE.address}</textarea>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-surface-400 mb-1.5">Other Information</label>
+                <textarea class="form-input min-h-[80px]" id="cp_other" placeholder="GSTIN, Tax ID, etc...">${COMPANY_PROFILE.other}</textarea>
+              </div>
+              <div class="flex justify-end">
+                <button type="submit" class="btn btn-primary" id="saveCompanyProfileBtn">Save Profile</button>
+              </div>
+            </form>
+          </div>
+        ` : ''}
+
+        ${APP.activeSettingsTab === 'leads' ? `
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Lead Statuses</h3>
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+              ${STATUSES.map(s => `
+                <div class="flex items-center justify-between py-2 border-b border-surface-800 last:border-0">
+                  <div class="flex items-center gap-3">
+                    <i class="fas fa-grip-vertical text-surface-600"></i>
+                    <span class="text-white">${STATUS_LABELS[s] || s} <span class="text-xs text-surface-500">(${s})</span></span>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn-ghost btn-sm text-xs" onclick="showEditLeadStatusModal('${s}')"><i class="fas fa-edit"></i></button>
+                    ${STATUSES.length > 1 ? `<button class="btn-ghost btn-sm text-xs text-rose-400" onclick="deleteLeadStatus('${s}')"><i class="fas fa-trash"></i></button>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddLeadStatusModal()"><i class="fas fa-plus"></i> Add Lead Status</button>
+          </div>
+
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Lead Priorities</h3>
+            <div class="space-y-2">
+              ${PRIORITIES.map(p => `
+                <div class="flex items-center justify-between py-2 border-b border-surface-800 last:border-0">
+                  <div class="flex items-center gap-3">
+                    <i class="fas fa-grip-vertical text-surface-600"></i>
+                    <span class="text-white">${PRIORITY_LABELS[p] || p} <span class="text-xs text-surface-500">(${p})</span></span>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn-ghost btn-sm text-xs" onclick="showEditLeadPriorityModal('${p}')"><i class="fas fa-edit"></i></button>
+                    ${PRIORITIES.length > 1 ? `<button class="btn-ghost btn-sm text-xs text-rose-400" onclick="deleteLeadPriority('${p}')"><i class="fas fa-trash"></i></button>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddLeadPriorityModal()"><i class="fas fa-plus"></i> Add Lead Priority</button>
+          </div>
+
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Lead Sources</h3>
+            <div class="flex flex-wrap gap-2">
+              ${SOURCES.map(s => `
+                <div class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-800 rounded-full text-sm text-surface-300">
+                  <span>${s.charAt(0).toUpperCase() + s.slice(1)}</span>
+                  <button class="text-xs text-surface-500 hover:text-rose-400 ml-1 focus:outline-none" onclick="deleteSource('${s}')" title="Delete Source"><i class="fas fa-times"></i></button>
+                </div>
+              `).join('')}
+            </div>
+            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddSourceModal()"><i class="fas fa-plus"></i> Add Source</button>
+          </div>
+
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Loan Types</h3>
+            <div class="space-y-2">
+              ${LOAN_TYPES.map((lt, i) => `
+                <div class="flex items-center justify-between py-2 border-b border-surface-800 last:border-0">
+                  <div class="flex items-center gap-3">
+                    <i class="fas fa-grip-vertical text-surface-600"></i>
+                    <span class="text-white">${LOAN_LABELS[lt] || lt}</span>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn-ghost btn-sm text-xs" onclick="showEditLoanTypeModal('${lt}')"><i class="fas fa-edit"></i></button>
+                    ${LOAN_TYPES.length > 1 ? `<button class="btn-ghost btn-sm text-xs text-rose-400" onclick="deleteLoanType('${lt}')"><i class="fas fa-trash"></i></button>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddLoanTypeModal()"><i class="fas fa-plus"></i> Add Loan Type</button>
+          </div>
+        ` : ''}
+
+        ${APP.activeSettingsTab === 'teams' ? `
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Teams</h3>
+            <div class="space-y-2">
+              ${TEAMS.map(t => {
+                 const teamMembers = USERS.filter(u => {
+                   const uTid = u.team_id && typeof u.team_id === 'object' ? (u.team_id._id || u.team_id.id) : u.team_id;
+                   return uTid === t.id;
+                 });
+
+                 return `
+                   <div class="flex items-center justify-between py-3 border-b border-surface-800 last:border-0">
+                     <div class="flex items-center gap-3">
+                       <div class="w-8 h-8 rounded bg-surface-800 flex items-center justify-center text-surface-400">
+                         <i class="fas fa-users text-sm"></i>
+                       </div>
+                       <div>
+                         <div class="flex items-center gap-2">
+                           <span class="font-medium text-white">${t.name}</span>
+                           <span class="text-xs text-surface-500">Leader: ${getUser(t.leader_id)?.name || 'Unassigned'}</span>
+                         </div>
+                         <div class="flex items-center gap-3 mt-1 text-[11px] text-surface-400">
+                           <span>Members: <strong class="text-white">${teamMembers.length}</strong></span>
+                         </div>
+                       </div>
+                     </div>
+                     <div class="flex gap-2">
+                       <button class="btn-ghost btn-sm text-xs" onclick="showEditTeamModal('${t.id}')" title="Edit Team"><i class="fas fa-edit"></i></button>
+                       ${TEAMS.length > 1 ? `<button class="btn-ghost btn-sm text-xs text-rose-400" onclick="deleteTeam('${t.id}')" title="Delete Team"><i class="fas fa-trash"></i></button>` : ''}
+                     </div>
+                   </div>
+                 `;
+              }).join('')}
+            </div>
+            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddTeamModal()"><i class="fas fa-plus"></i> Add Team Name</button>
+          </div>
+        ` : ''}
+
+        ${APP.activeSettingsTab === 'targets' ? `
+          <div class="card">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-display font-semibold text-white">Monthly Disbursed Amount Targets</h3>
+              <button class="btn btn-primary text-sm py-1.5" onclick="saveTargets()">Save Targets</button>
+            </div>
+            
+            <div class="space-y-6">
+              <div>
+                <h4 class="text-sm font-semibold text-surface-300 mb-3 border-b border-surface-800 pb-2">Team Targets</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  ${TEAMS.map(t => `
+                    <div>
+                      <label class="block text-xs font-medium text-surface-400 mb-1">${t.name}</label>
+                      <div class="relative">
+                        <span class="absolute left-3 top-2 text-surface-500">₹</span>
+                        <input type="number" class="form-input pl-7 target-input" data-type="team" data-id="${t.id}" value="${TARGETS.teams[t.id] || ''}" placeholder="e.g. 5000000">
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+              
+              <div>
+                <h4 class="text-sm font-semibold text-surface-300 mb-3 border-b border-surface-800 pb-2">Agent Targets</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                  ${USERS.filter(u => u.role === 'agent' && u.active).map(a => `
+                    <div>
+                      <label class="block text-xs font-medium text-surface-400 mb-1">${a.name} <span class="text-surface-600 text-[10px]">(${TEAMS.find(t=>t.id===a.team_id)?.name || 'No Team'})</span></label>
+                      <div class="relative">
+                        <span class="absolute left-3 top-2 text-surface-500">₹</span>
+                        <input type="number" class="form-input pl-7 target-input" data-type="agent" data-id="${a.id}" value="${TARGETS.agents[a.id] || ''}" placeholder="e.g. 1000000">
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+        ${APP.activeSettingsTab === 'system' ? `
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Distribution Rules</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm text-surface-400 mb-1.5">Allocation Method</label>
+                <select id="settingAllocationMethod" class="form-input w-auto">
+                  <option value="round_robin" ${DISTRIBUTION_RULES.method === 'round_robin' ? 'selected' : ''}>Round Robin</option>
+                  <option value="weighted" ${DISTRIBUTION_RULES.method === 'weighted' ? 'selected' : ''}>Weighted (by conversion rate)</option>
+                  <option value="least_load" ${DISTRIBUTION_RULES.method === 'least_load' ? 'selected' : ''}>Least Load First</option>
+                  <option value="manual" ${DISTRIBUTION_RULES.method === 'manual' ? 'selected' : ''}>Manual Only</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm text-surface-400 mb-1.5">Max Active Leads per Agent</label>
+                <input type="number" id="settingMaxLeads" class="form-input w-auto" value="${DISTRIBUTION_RULES.max_leads}" min="1">
+              </div>
+              <div>
+                <label class="block text-sm text-surface-400 mb-1.5">Lead Aging Alert (days)</label>
+                <input type="number" id="settingLeadAging" class="form-input w-auto" value="${DISTRIBUTION_RULES.aging_days}" min="1">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm mt-4" id="saveSettingsBtn" onclick="saveDistributionSettings()"><i class="fas fa-check"></i> Save Settings</button>
+          </div>
+
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Backup & Restore</h3>
+            <div class="space-y-6">
+              <div>
+                <p class="text-sm text-surface-400 mb-3">Download a complete JSON backup of all application data (Leads, Users, Teams, Settings, Call Logs).</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <label class="block text-[11px] text-surface-500 uppercase tracking-wider mb-1">Start Date (Optional)</label>
+                    <input type="date" id="backupStartDate" class="form-input text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-surface-500 uppercase tracking-wider mb-1">End Date (Optional)</label>
+                    <input type="date" id="backupEndDate" class="form-input text-sm">
+                  </div>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="backupDataJSON()">
+                  <i class="fas fa-file-export"></i> Download JSON Backup
+                </button>
+              </div>
+              
+              <div class="pt-6 border-t border-surface-800">
+                <h4 class="text-sm font-medium text-white mb-2">Restore from Backup</h4>
+                <p class="text-xs text-surface-500 mb-3">Upload a previously downloaded JSON backup file. This will replace existing data.</p>
+                <div class="flex items-center gap-3">
+                  <input type="file" id="restoreInput" accept=".json" class="hidden" onchange="handleJSONRestore(event)">
+                  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('restoreInput').click()">
+                    <i class="fas fa-file-import"></i> Select Backup File
+                  </button>
+                  <div id="restoreFileInfo" class="text-xs text-surface-400 italic"></div>
+                </div>
+                <button id="restoreConfirmBtn" class="btn btn-primary btn-sm mt-4 hidden" onclick="confirmJSONRestore()">
+                  <i class="fas fa-upload"></i> Restore Data Now
+                </button>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+async function saveDistributionSettings() {
+  const method = document.getElementById('settingAllocationMethod').value;
+  const max_leads = parseInt(document.getElementById('settingMaxLeads').value);
+  const aging_days = parseInt(document.getElementById('settingLeadAging').value);
+  
+  const btn = document.getElementById('saveSettingsBtn');
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+  
+  try {
+    const newVal = { method, max_leads, aging_days };
+    await fetchAPI('/settings/distribution_rules', {
+      method: 'POST',
+      body: JSON.stringify({ value: newVal })
+    });
+    DISTRIBUTION_RULES = newVal;
+    toast('Distribution settings saved successfully');
+  } catch (err) {
+    // Error handled by fetchAPI toast
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+// ========== WORK HISTORY ==========
+let workHistoryFilter = {
+  search: '',
+  agentId: 'all',
+  dateRange: '30',
+  startDate: '',
+  endDate: '',
+  outcome: 'all',
+  priority: 'all'
+};
+
+let workHistoryColumns = {
+  dateTime: { label: 'Date & Time', visible: true },
+  agent: { label: 'Agent', visible: true },
+  team: { label: 'Team Name', visible: true },
+  lead: { label: 'Lead', visible: true },
+  phone: { label: 'Phone', visible: true },
+  email: { label: 'Email', visible: true },
+  loanAmount: { label: 'Loan Amount', visible: true },
+  loanType: { label: 'Loan Type', visible: true },
+  leadStatus: { label: 'Lead Status', visible: true },
+  priority: { label: 'Priority', visible: true },
+  aging: { label: 'Aging', visible: true },
+  outcome: { label: 'Call Outcome', visible: true },
+  notes: { label: 'Notes', visible: true },
+  followUp: { label: 'Follow-up Due', visible: true }
+};
+
+let showColumnSelector = false;
+
+function toggleWorkHistoryColumn(key) {
+  if (workHistoryColumns[key]) {
+    workHistoryColumns[key].visible = !workHistoryColumns[key].visible;
+    const visibleCount = Object.values(workHistoryColumns).filter(c => c.visible).length;
+    if (visibleCount === 0) {
+      workHistoryColumns[key].visible = true;
+      toast('At least one column must be visible', 'warning');
+      return;
+    }
+    renderPage();
+  }
+}
+
+function selectAllColumns(val) {
+  if (!val) {
+    Object.keys(workHistoryColumns).forEach((key, index) => {
+      workHistoryColumns[key].visible = (index === 0);
+    });
+    toast('Cleared all except Date & Time', 'info');
+  } else {
+    Object.keys(workHistoryColumns).forEach(key => {
+      workHistoryColumns[key].visible = true;
+    });
+  }
+  renderPage();
+}
+
+function resetWorkHistoryColumns() {
+  Object.keys(workHistoryColumns).forEach(key => {
+    workHistoryColumns[key].visible = true;
+  });
+  renderPage();
+}
+
+const OUTCOME_LABELS = {
+  answered: 'Answered',
+  not_answered: 'Not Answered',
+  busy: 'Busy',
+  wrong_number: 'Wrong Number',
+  callback_requested: 'Callback Requested'
+};
+
+function getOutcomeBadgeClass(outcome) {
+  switch (outcome) {
+    case 'answered':
+      return 'badge-new';
+    case 'not_answered':
+      return 'badge-rejected';
+    case 'busy':
+      return 'badge-documents-pending';
+    case 'wrong_number':
+      return 'badge-dead';
+    case 'callback_requested':
+      return 'badge-contacted';
+    default:
+      return 'badge-new';
+  }
+}
+
+function getFilteredCalls() {
+  let list = [...callLogs];
+
+  if (APP.currentRole === 'tl') {
+    const tl = getUser(APP.currentUserId);
+    if (tl) {
+      const tlTeamId = tl.team_id && typeof tl.team_id === 'object' ? (tl.team_id._id || tl.team_id.id) : tl.team_id;
+      list = list.filter(c => {
+        const agent = getUser(c.agent_id);
+        if (!agent) return false;
+        const agentTeamId = agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : agent.team_id;
+        return agentTeamId === tlTeamId || agent.id === tl.id;
+      });
+    } else {
+      list = [];
+    }
+  } else if (APP.currentRole === 'agent') {
+    list = list.filter(c => c.agent_id === APP.currentUserId);
+  }
+
+  if (workHistoryFilter.agentId !== 'all') {
+    list = list.filter(c => c.agent_id === workHistoryFilter.agentId);
+  }
+
+  if (workHistoryFilter.outcome !== 'all') {
+    list = list.filter(c => c.outcome === workHistoryFilter.outcome);
+  }
+
+  if (workHistoryFilter.priority !== 'all') {
+    list = list.filter(c => {
+      const lead = leads.find(l => l.id === c.lead_id || l._id === c.lead_id);
+      return lead && (lead.priority || 'cold').toLowerCase().trim() === workHistoryFilter.priority;
+    });
+  }
+
+  const now = new Date();
+  if (workHistoryFilter.dateRange === 'all') {
+    // No filtering
+  } else if (workHistoryFilter.dateRange === 'custom') {
+    if (workHistoryFilter.startDate) {
+      const start = new Date(workHistoryFilter.startDate);
+      start.setHours(0, 0, 0, 0);
+      list = list.filter(c => new Date(c.created_at) >= start);
+    }
+    if (workHistoryFilter.endDate) {
+      const end = new Date(workHistoryFilter.endDate);
+      end.setHours(23, 59, 59, 999);
+      list = list.filter(c => new Date(c.created_at) <= end);
+    }
+  } else {
+    const filterDate = new Date();
+    filterDate.setDate(now.getDate() - parseInt(workHistoryFilter.dateRange));
+    list = list.filter(c => new Date(c.created_at) >= filterDate);
+  }
+
+  if (workHistoryFilter.search) {
+    const q = workHistoryFilter.search.toLowerCase().trim();
+    list = list.filter(c => {
+      const lead = leads.find(l => l.id === c.lead_id || l._id === c.lead_id);
+      const agent = getUser(c.agent_id);
+      const teamId = agent ? (agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : agent.team_id) : null;
+      const team = getTeam(teamId);
+      const loanTypeLabel = lead ? (LOAN_LABELS[lead.loan_type] || lead.loan_type || '') : '';
+      return (
+        (lead && lead.name.toLowerCase().includes(q)) ||
+        (lead && lead.phone.includes(q)) ||
+        (lead && lead.email && lead.email.toLowerCase().includes(q)) ||
+        (lead && loanTypeLabel.toLowerCase().includes(q)) ||
+        (agent && agent.name.toLowerCase().includes(q)) ||
+        (team && team.name.toLowerCase().includes(q)) ||
+        (c.outcome && c.outcome.toLowerCase().includes(q)) ||
+        (c.notes && c.notes.toLowerCase().includes(q))
+      );
+    });
+  }
+
+  list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  return list;
+}
+
+function handleWorkHistorySearch(val) {
+  workHistoryFilter.search = val;
+  const list = getFilteredCalls();
+  
+  const countEl = document.getElementById('workHistoryCount');
+  if (countEl) countEl.textContent = `${list.length} calls recorded`;
+  
+  const tbody = document.getElementById('workHistoryTableBody');
+  if (tbody) {
+    if (list.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="12" class="text-center py-12 text-surface-500">
+            <div class="flex flex-col items-center justify-center">
+              <i class="fas fa-phone-slash text-4xl mb-3 text-surface-600"></i>
+              <p class="font-medium text-surface-400">No call history found</p>
+              <p class="text-xs text-surface-600 mt-1">Try adjusting your filters or search term</p>
+            </div>
+          </td>
+        </tr>
+      `;
+    } else {
+      tbody.innerHTML = list.map(c => {
+        const lead = leads.find(l => l.id === c.lead_id || l._id === c.lead_id);
+        const agent = getUser(c.agent_id);
+        
+        const leadName = lead ? `<span class="text-white hover:underline cursor-pointer font-medium" onclick="showLeadDetail('${lead.id || lead._id}')">${lead.name}</span>` : '<span class="text-surface-500 italic">Unknown Lead</span>';
+        const leadPhone = lead ? lead.phone : '—';
+        const leadStatus = lead ? `<span class="badge ${getStatusBadgeClass(lead.status)}">${STATUS_LABELS[lead.status] || lead.status}</span>` : '—';
+        const loanType = lead ? (LOAN_LABELS[lead.loan_type] || lead.loan_type || '—') : '—';
+        
+        const leadPriorityVal = lead ? (lead.priority || 'cold').toLowerCase().trim() : 'cold';
+        let priorityBadgeClass = 'badge-contacted'; // cold
+        if (leadPriorityVal === 'hot') priorityBadgeClass = 'badge-hot';
+        else if (leadPriorityVal === 'warm') priorityBadgeClass = 'badge-documents-pending';
+        const leadPriority = lead ? `<span class="badge ${priorityBadgeClass}">${PRIORITY_LABELS[leadPriorityVal] || leadPriorityVal}</span>` : '—';
+
+        const agentName = agent ? agent.name : '<span class="text-surface-500 italic">Unknown Agent</span>';
+        const teamId = agent ? (agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : agent.team_id) : null;
+        const team = getTeam(teamId);
+        const teamName = team ? team.name : '—';
+        
+        const formattedTime = new Date(c.created_at).toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+
+        const outcomeBadge = `<span class="badge ${getOutcomeBadgeClass(c.outcome)}">${OUTCOME_LABELS[c.outcome] || c.outcome}</span>`;
+        const followUpBadge = c.follow_up_at ? `<span class="badge badge-documents-pending"><i class="fas fa-calendar-alt mr-1 text-[10px]"></i> ${new Date(c.follow_up_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>` : '—';
+        
+        return `
+          <tr class="hover:bg-surface-800/30">
+            <td class="text-surface-400 whitespace-nowrap text-xs">${formattedTime}</td>
+            <td class="text-white font-medium whitespace-nowrap">${agentName}</td>
+            <td class="text-surface-400 whitespace-nowrap text-sm">${teamName}</td>
+            <td class="text-white whitespace-nowrap">${leadName}</td>
+            <td class="text-surface-400 whitespace-nowrap text-sm">${leadPhone}</td>
+            <td class="font-medium text-white whitespace-nowrap">${lead ? formatCurrency(lead.amount_requested) : '—'}</td>
+            <td class="text-surface-400 whitespace-nowrap text-sm capitalize">${loanType}</td>
+            <td class="whitespace-nowrap">${leadStatus}</td>
+            <td class="whitespace-nowrap">${leadPriority}</td>
+            <td class="whitespace-nowrap">${outcomeBadge}</td>
+            <td class="text-surface-300 text-sm max-w-xs truncate" title="${c.notes || ''}">${c.notes || '—'}</td>
+            <td class="whitespace-nowrap">${followUpBadge}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+}
+
+function exportWorkHistoryToCSV() {
+  const list = getFilteredCalls();
+  if (list.length === 0) {
+    toast('No data to export', 'warning');
+    return;
+  }
+
+  const columnDefs = [
+    { key: 'dateTime', label: 'Date & Time' },
+    { key: 'agent', label: 'Agent' },
+    { key: 'team', label: 'Team Name' },
+    { key: 'lead', label: 'Lead' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'email', label: 'Email' },
+    { key: 'loanAmount', label: 'Loan Amount' },
+    { key: 'loanType', label: 'Loan Type' },
+    { key: 'leadStatus', label: 'Lead Status' },
+    { key: 'priority', label: 'Priority' },
+    { key: 'aging', label: 'Aging' },
+    { key: 'outcome', label: 'Call Outcome' },
+    { key: 'notes', label: 'Notes' },
+    { key: 'followUp', label: 'Follow-up Due' }
+  ];
+
+  const activeCols = columnDefs.filter(col => workHistoryColumns[col.key] && workHistoryColumns[col.key].visible);
+
+  if (activeCols.length === 0) {
+    toast('No visible columns to export', 'warning');
+    return;
+  }
+
+  const headers = activeCols.map(col => col.label);
+
+  const rows = list.map(c => {
+    const lead = leads.find(l => l.id === c.lead_id || l._id === c.lead_id);
+    const agent = getUser(c.agent_id);
+    const teamId = agent ? (agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : agent.team_id) : null;
+    const team = getTeam(teamId);
+
+    const formattedTime = new Date(c.created_at).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    const agentName = agent ? agent.name : 'Unknown Agent';
+    const teamName = team ? team.name : '—';
+    const leadName = lead ? lead.name : 'Unknown Lead';
+    const leadPhone = lead ? lead.phone : '—';
+    const leadEmail = lead ? (lead.email || '—') : '—';
+    const loanAmount = lead ? lead.amount_requested : 0;
+    const loanTypeVal = lead ? (LOAN_LABELS[lead.loan_type] || lead.loan_type || '—') : '—';
+    const leadStatusVal = lead ? (STATUS_LABELS[lead.status] || lead.status || '—') : '—';
+    const leadPriorityVal = lead ? (PRIORITY_LABELS[lead.priority] || lead.priority || 'cold') : '—';
+    const outcomeVal = OUTCOME_LABELS[c.outcome] || c.outcome || '—';
+    const notesVal = c.notes || '—';
+    const followUpVal = c.follow_up_due ? new Date(c.follow_up_due).toLocaleDateString() : '—';
+
+    return activeCols.map(col => {
+      switch (col.key) {
+        case 'dateTime': return formattedTime;
+        case 'agent': return agentName;
+        case 'team': return teamName;
+        case 'lead': return leadName;
+        case 'phone': return leadPhone;
+        case 'email': return leadEmail;
+        case 'loanAmount': return loanAmount;
+        case 'loanType': return loanTypeVal;
+        case 'leadStatus': return leadStatusVal;
+        case 'priority': return leadPriorityVal;
+        case 'aging': return lead ? getAging(lead.assigned_at) : '—';
+        case 'outcome': return outcomeVal;
+        case 'notes': return notesVal;
+        case 'followUp': return followUpVal;
+        default: return '';
+      }
+    });
+  });
+
+  const escapeCSV = (val) => {
+    if (val === null || val === undefined) return '';
+    let str = String(val);
+    str = str.replace(/"/g, '""');
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+      str = `"${str}"`;
+    }
+    return str;
+  };
+
+  const csvContent = [
+    headers.map(escapeCSV).join(','),
+    ...rows.map(row => row.map(escapeCSV).join(','))
+  ].join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  
+  const today = new Date();
+  const dateStr = today.toISOString().split('T')[0];
+  link.setAttribute('download', `work_history_${dateStr}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  toast('Work history exported to CSV successfully');
+}
+
+// ========== REPORTS ==========
+function setReportsDateRange(val) { REPORTS_FILTER.dateRange = val; renderPage(); }
+function setReportsTeam(val) { REPORTS_FILTER.teamId = val; renderPage(); }
+function setReportsAgent(val) { REPORTS_FILTER.agentId = val; renderPage(); }
+function clearReportsFilter() {
+  REPORTS_FILTER = { dateRange: 'all_time', teamId: 'all', agentId: 'all', startDate: '', endDate: '' };
+  renderPage();
+}
+
+function renderReports() {
+  const isManager = APP.currentRole === 'admin' || APP.currentRole === 'tl';
+  
+  // Date filtering
+  const now = new Date();
+  let startDate = new Date(0); // all_time
+  let endDate = new Date();
+  
+  if (REPORTS_FILTER.dateRange === 'today') {
+    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  } else if (REPORTS_FILTER.dateRange === 'this_week') {
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    startDate = new Date(now.setDate(diff));
+    startDate.setHours(0,0,0,0);
+  } else if (REPORTS_FILTER.dateRange === 'this_month') {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (REPORTS_FILTER.dateRange === 'custom') {
+    if (REPORTS_FILTER.startDate) startDate = new Date(REPORTS_FILTER.startDate);
+    if (REPORTS_FILTER.endDate) {
+      endDate = new Date(REPORTS_FILTER.endDate);
+      endDate.setHours(23,59,59,999);
+    }
+  }
+
+  // Team & Agent Filtering
+  let agentIds = [];
+  if (APP.currentRole === 'agent') {
+    agentIds = [APP.currentUserId];
+  } else {
+    let availableAgents = USERS.filter(u => u.role === 'agent' && u.active);
+    if (APP.currentRole === 'tl') {
+      const myTeam = getUser(APP.currentUserId)?.team_id;
+      const teamId = typeof myTeam === 'object' ? (myTeam._id || myTeam.id) : myTeam;
+      availableAgents = availableAgents.filter(u => {
+        const uTeam = typeof u.team_id === 'object' ? (u.team_id._id || u.team_id.id) : u.team_id;
+        return uTeam === teamId;
+      });
+    }
+    if (REPORTS_FILTER.teamId !== 'all') {
+      availableAgents = availableAgents.filter(u => {
+        const uTeam = typeof u.team_id === 'object' ? (u.team_id._id || u.team_id.id) : u.team_id;
+        return uTeam === REPORTS_FILTER.teamId;
+      });
+    }
+    if (REPORTS_FILTER.agentId !== 'all') {
+      availableAgents = availableAgents.filter(u => u.id === REPORTS_FILTER.agentId);
+    }
+    agentIds = availableAgents.map(u => u.id);
+  }
+
+  // Filter Leads
+  let filteredLeads = leads.filter(l => agentIds.includes(l.assigned_agent_id));
+  filteredLeads = filteredLeads.filter(l => {
+    const d = new Date(l.created_at);
+    return d >= startDate && d <= endDate;
+  });
+
+  // Filter CallLogs
+  let filteredCallLogs = callLogs.filter(c => agentIds.includes(c.agent_id));
+  filteredCallLogs = filteredCallLogs.filter(c => {
+    const d = new Date(c.created_at);
+    return d >= startDate && d <= endDate;
+  });
+
+  // KPIs
+  const totalLeads = filteredLeads.length;
+  const disbursedLeads = filteredLeads.filter(l => l.status === 'disbursed');
+  const disbursedCount = disbursedLeads.length;
+  const totalLoanAmount = disbursedLeads.reduce((sum, l) => sum + (Number(l.amount_requested) || 0), 0);
+  const conversionRate = totalLeads > 0 ? ((disbursedCount / totalLeads) * 100).toFixed(1) : 0;
+  
+  // Total calls made (unique leads per day per agent calculation)
+  const totalCallsMade = new Set(filteredCallLogs.map(c => `${c.lead_id}_${new Date(c.created_at).toDateString()}`)).size;
+
+  let totalTargetAmt = 0;
+  if (APP.currentRole === 'agent') {
+    totalTargetAmt = TARGETS.agents[APP.currentUserId] || 0;
+  } else if (REPORTS_FILTER.agentId !== 'all') {
+    totalTargetAmt = TARGETS.agents[REPORTS_FILTER.agentId] || 0;
+  } else if (REPORTS_FILTER.teamId !== 'all') {
+    totalTargetAmt = TARGETS.teams[REPORTS_FILTER.teamId] || 0;
+  } else if (APP.currentRole === 'tl') {
+    const myTeam = getUser(APP.currentUserId)?.team_id;
+    const teamId = typeof myTeam === 'object' ? (myTeam._id || myTeam.id) : myTeam;
+    totalTargetAmt = TARGETS.teams[teamId] || 0;
+  } else {
+    totalTargetAmt = Object.values(TARGETS.teams || {}).reduce((sum, v) => sum + (Number(v)||0), 0);
+  }
+  const totalTargetPct = totalTargetAmt > 0 ? ((totalLoanAmount / totalTargetAmt) * 100).toFixed(1) : 0;
+
+
+  // Render Filters UI options
+  const teams = TEAMS;
+  let availableAgents = USERS.filter(u => u.role === 'agent' && u.active);
+  if (APP.currentRole === 'tl') {
+    const myTeam = getUser(APP.currentUserId)?.team_id;
+    const teamId = typeof myTeam === 'object' ? (myTeam._id || myTeam.id) : myTeam;
+    availableAgents = availableAgents.filter(u => {
+      const uTeam = typeof u.team_id === 'object' ? (u.team_id._id || u.team_id.id) : u.team_id;
+      return uTeam === teamId;
+    });
+  }
+  if (REPORTS_FILTER.teamId !== 'all') {
+    availableAgents = availableAgents.filter(u => {
+      const uTeam = typeof u.team_id === 'object' ? (u.team_id._id || u.team_id.id) : u.team_id;
+      return uTeam === REPORTS_FILTER.teamId;
+    });
+  }
+
+  return `
+    <div class="fade-in">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="font-display font-bold text-2xl text-white">Reports</h2>
+          <p class="text-surface-400 text-sm mt-1">Key performance indicators and analytics</p>
+        </div>
+      </div>
+
+      <div class="card mb-6">
+        <div class="flex flex-wrap gap-3">
+          <select class="form-input py-2 text-sm w-48 rounded-full" onchange="setReportsDateRange(this.value)">
+            <option value="all_time" ${REPORTS_FILTER.dateRange === 'all_time' ? 'selected' : ''}>All Time</option>
+            <option value="today" ${REPORTS_FILTER.dateRange === 'today' ? 'selected' : ''}>Today</option>
+            <option value="this_week" ${REPORTS_FILTER.dateRange === 'this_week' ? 'selected' : ''}>This Week</option>
+            <option value="this_month" ${REPORTS_FILTER.dateRange === 'this_month' ? 'selected' : ''}>This Month</option>
+            <option value="custom" ${REPORTS_FILTER.dateRange === 'custom' ? 'selected' : ''}>Custom Range</option>
+          </select>
+
+          ${REPORTS_FILTER.dateRange === 'custom' ? `
+            <div class="flex items-center gap-2">
+              <input type="date" class="form-input py-2 text-sm w-auto rounded-full" value="${REPORTS_FILTER.startDate || ''}" onchange="REPORTS_FILTER.startDate=this.value; renderPage()">
+              <span class="text-surface-500">to</span>
+              <input type="date" class="form-input py-2 text-sm w-auto rounded-full" value="${REPORTS_FILTER.endDate || ''}" onchange="REPORTS_FILTER.endDate=this.value; renderPage()">
+            </div>
+          ` : ''}
+
+          ${APP.currentRole === 'admin' ? `
+            <select class="form-input py-2 text-sm w-48 rounded-full" onchange="REPORTS_FILTER.agentId='all'; setReportsTeam(this.value);">
+              <option value="all">All Teams</option>
+              ${teams.map(t => `<option value="${t.id}" ${REPORTS_FILTER.teamId === t.id ? 'selected' : ''}>${t.name}</option>`).join('')}
+            </select>
+          ` : ''}
+
+          ${isManager ? `
+            <select class="form-input py-2 text-sm w-48 rounded-full" onchange="setReportsAgent(this.value)">
+              <option value="all">All Agents</option>
+              ${availableAgents.map(a => `<option value="${a.id}" ${REPORTS_FILTER.agentId === a.id ? 'selected' : ''}>${a.name}</option>`).join('')}
+            </select>
+          ` : ''}
+          <button class="btn btn-ghost text-sm text-surface-400 hover:text-white transition-colors" onclick="clearReportsFilter()">
+            <i class="fas fa-times"></i> Clear Filter
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+        <div class="card !p-4 flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-surface-400 mb-1">Total Leads</p>
+            <h3 class="text-2xl font-display font-bold text-white">${totalLeads}</h3>
+          </div>
+          <div class="w-10 h-10 rounded-full bg-brand-500/20 flex items-center justify-center text-brand-400 text-lg">
+            <i class="fas fa-users"></i>
+          </div>
+        </div>
+        <div class="card !p-4 flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-surface-400 mb-1">Calls Made</p>
+            <h3 class="text-2xl font-display font-bold text-sky-400">${totalCallsMade}</h3>
+          </div>
+          <div class="w-10 h-10 rounded-full bg-sky-500/20 flex items-center justify-center text-sky-400 text-lg">
+            <i class="fas fa-phone-alt"></i>
+          </div>
+        </div>
+        <div class="card !p-4 flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-surface-400 mb-1">Disbursed Leads</p>
+            <h3 class="text-2xl font-display font-bold text-emerald-400">${disbursedCount}</h3>
+          </div>
+          <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-lg">
+            <i class="fas fa-check-circle"></i>
+          </div>
+        </div>
+        <div class="card !p-4 flex items-center justify-between">
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-medium text-surface-400 mb-1">Disbursed Amt</p>
+            <div class="flex items-end gap-2 flex-wrap">
+              <h3 class="text-xl font-display font-bold text-amber-400 truncate" title="₹${formatCurrency(totalLoanAmount)}">₹${formatCurrency(totalLoanAmount)}</h3>
+              ${totalTargetAmt > 0 ? `<span class="text-xs ${totalTargetPct >= 100 ? 'text-emerald-400' : 'text-surface-500'} mb-1">/ ₹${formatCurrency(totalTargetAmt)} (${totalTargetPct}%)</span>` : ''}
+            </div>
+          </div>
+          <div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-lg shrink-0 ml-2">
+            <i class="fas fa-rupee-sign"></i>
+          </div>
+        </div>
+        <div class="card !p-4 flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-surface-400 mb-1">Conversion</p>
+            <h3 class="text-2xl font-display font-bold text-rose-400">${conversionRate}%</h3>
+          </div>
+          <div class="w-10 h-10 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400 text-lg shrink-0">
+            <i class="fas fa-chart-pie"></i>
+          </div>
+        </div>
+      </div>
+
+      ${isManager ? `
+      <div class="card mt-2">
+      ${APP.currentRole === 'admin' ? `
+      <div class="card mt-2 mb-6">
+        <h3 class="text-lg font-bold text-white mb-4">Teams Comparison</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-surface-700">
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Team Name</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Leads Assigned</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Calls Made</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Disbursed Leads</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Disbursed Amount</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Target</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Achieved %</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Conversion Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(() => {
+                const teamStats = teams.map(team => {
+                  const teamAgents = USERS.filter(u => u.role === 'agent' && u.active && (u.team_id === team.id || (typeof u.team_id === 'object' && (u.team_id._id || u.team_id.id) === team.id))).map(u => u.id);
+                  let aLeads = leads.filter(l => teamAgents.includes(l.assigned_agent_id));
+                  aLeads = aLeads.filter(l => {
+                    const d = new Date(l.created_at);
+                    return d >= startDate && d <= endDate;
+                  });
+                  let aCallLogs = callLogs.filter(c => teamAgents.includes(c.agent_id));
+                  aCallLogs = aCallLogs.filter(c => {
+                    const d = new Date(c.created_at);
+                    return d >= startDate && d <= endDate;
+                  });
+                  const aDisbursed = aLeads.filter(l => l.status === 'disbursed');
+                  const aDisbursedAmount = aDisbursed.reduce((sum, l) => sum + (Number(l.amount_requested) || 0), 0);
+                  const aTotalCalls = new Set(aCallLogs.map(c => `${c.lead_id}_${new Date(c.created_at).toDateString()}`)).size;
+                  const aConversion = aLeads.length > 0 ? ((aDisbursed.length / aLeads.length) * 100).toFixed(1) : 0;
+                  const targetAmt = TARGETS.teams[team.id] || 0;
+                  const targetPct = targetAmt > 0 ? ((aDisbursedAmount / targetAmt) * 100).toFixed(1) : 0;
+                  return { name: team.name, leads: aLeads.length, calls: aTotalCalls, disbursed: aDisbursed.length, amount: aDisbursedAmount, target: targetAmt, targetPct: targetPct, conversion: aConversion };
+                });
+                teamStats.sort((a, b) => b.amount - a.amount || b.conversion - a.conversion);
+                if (teamStats.length === 0) return '<tr><td colspan="8" class="py-8 text-center text-surface-500">No data available</td></tr>';
+                return teamStats.map(m => `
+                  <tr class="border-b border-surface-800/50 hover:bg-surface-800/20 transition-colors">
+                    <td class="py-3 px-4 text-white font-medium">${m.name}</td>
+                    <td class="py-3 px-4 text-surface-300">${m.leads}</td>
+                    <td class="py-3 px-4 text-surface-300">${m.calls}</td>
+                    <td class="py-3 px-4 text-emerald-400 font-medium">${m.disbursed}</td>
+                    <td class="py-3 px-4 text-amber-400 font-medium">₹${formatCurrency(m.amount)}</td>
+                    <td class="py-3 px-4 text-surface-400 font-medium">${m.target > 0 ? '₹' + formatCurrency(m.target) : '-'}</td>
+                    <td class="py-3 px-4 ${m.targetPct >= 100 ? 'text-emerald-400' : 'text-rose-400'}">${m.target > 0 ? m.targetPct + '%' : '-'}</td>
+                    <td class="py-3 px-4 text-sky-400">${m.conversion}%</td>
+                  </tr>
+                `).join('');
+              })()}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ` : ''}
+
+        <h3 class="text-lg font-bold text-white mb-4">Team Member Comparison</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-surface-700">
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Agent Name</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Leads Assigned</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Calls Made</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Disbursed Leads</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Disbursed Amount</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Target</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Achieved %</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Conversion Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(() => {
+                const memberStats = availableAgents.map(agent => {
+                  let aLeads = leads.filter(l => l.assigned_agent_id === agent.id);
+                  aLeads = aLeads.filter(l => {
+                    const d = new Date(l.created_at);
+                    return d >= startDate && d <= endDate;
+                  });
+                  let aCallLogs = callLogs.filter(c => c.agent_id === agent.id);
+                  aCallLogs = aCallLogs.filter(c => {
+                    const d = new Date(c.created_at);
+                    return d >= startDate && d <= endDate;
+                  });
+                  const aDisbursed = aLeads.filter(l => l.status === 'disbursed');
+                  const aDisbursedAmount = aDisbursed.reduce((sum, l) => sum + (Number(l.amount_requested) || 0), 0);
+                  const aTotalCalls = new Set(aCallLogs.map(c => `${c.lead_id}_${new Date(c.created_at).toDateString()}`)).size;
+                  const aConversion = aLeads.length > 0 ? ((aDisbursed.length / aLeads.length) * 100).toFixed(1) : 0;
+                  const targetAmt = TARGETS.agents[agent.id] || 0;
+                  const targetPct = targetAmt > 0 ? ((aDisbursedAmount / targetAmt) * 100).toFixed(1) : 0;
+                  return { name: agent.name, leads: aLeads.length, calls: aTotalCalls, disbursed: aDisbursed.length, amount: aDisbursedAmount, target: targetAmt, targetPct: targetPct, conversion: aConversion };
+                });
+                memberStats.sort((a, b) => b.amount - a.amount || b.conversion - a.conversion);
+                if (memberStats.length === 0) return '<tr><td colspan="8" class="py-8 text-center text-surface-500">No data available</td></tr>';
+                return memberStats.map(m => `
+                  <tr class="border-b border-surface-800/50 hover:bg-surface-800/20 transition-colors">
+                    <td class="py-3 px-4 text-white font-medium">${m.name}</td>
+                    <td class="py-3 px-4 text-surface-300">${m.leads}</td>
+                    <td class="py-3 px-4 text-surface-300">${m.calls}</td>
+                    <td class="py-3 px-4 text-emerald-400 font-medium">${m.disbursed}</td>
+                    <td class="py-3 px-4 text-amber-400 font-medium">₹${formatCurrency(m.amount)}</td>
+                    <td class="py-3 px-4 text-surface-400 font-medium">${m.target > 0 ? '₹' + formatCurrency(m.target) : '-'}</td>
+                    <td class="py-3 px-4 ${m.targetPct >= 100 ? 'text-emerald-400' : 'text-rose-400'}">${m.target > 0 ? m.targetPct + '%' : '-'}</td>
+                    <td class="py-3 px-4 text-rose-400">${m.conversion}%</td>
+                  </tr>
+                `).join('');
+              })()}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderWorkHistory() {
+  const list = getFilteredCalls();
+  const isCustom = workHistoryFilter.dateRange === 'custom';
+  const agents = APP.currentRole === 'admin' 
+    ? USERS.filter(u => u.role === 'agent' && u.active) 
+    : APP.currentRole === 'tl' 
+      ? USERS.filter(u => u.role === 'agent' && u.active && (u.team_id === getUser(APP.currentUserId)?.team_id || (typeof u.team_id === 'object' && (u.team_id._id || u.team_id.id) === (getUser(APP.currentUserId)?.team_id?._id || getUser(APP.currentUserId)?.team_id))))
+      : [];
+
+  const visibleColsCount = Object.values(workHistoryColumns).filter(c => c.visible).length;
+
+  return `
+    <div class="fade-in">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="font-display font-bold text-2xl text-white">Work History</h2>
+          <p id="workHistoryCount" class="text-surface-400 text-sm mt-1">${list.length} calls recorded</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-secondary text-sm flex items-center gap-2" onclick="showColumnSelector = !showColumnSelector; renderPage()">
+            <i class="fas fa-columns"></i> Columns
+          </button>
+          <button class="btn btn-primary text-sm flex items-center gap-2" onclick="exportWorkHistoryToCSV()">
+            <i class="fas fa-file-export"></i> Export CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Column Customize Panel -->
+      ${showColumnSelector ? `
+        <div class="card mb-4 bg-surface-900 border border-brand-500/20 p-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 pb-2 border-b border-surface-800">
+            <span class="text-sm font-semibold text-white flex items-center gap-2">
+              <i class="fas fa-sliders-h text-brand-400"></i> Customize Table Columns
+            </span>
+            <div class="flex flex-wrap items-center gap-3">
+              <button class="text-xs text-brand-400 hover:text-brand-300 transition-colors font-medium" onclick="selectAllColumns(true)">Select All</button>
+              <span class="text-surface-600 text-xs">|</span>
+              <button class="text-xs text-rose-400 hover:text-rose-300 transition-colors font-medium" onclick="selectAllColumns(false)">Clear All</button>
+              <span class="text-surface-600 text-xs">|</span>
+              <button class="text-xs text-surface-400 hover:text-white transition-colors font-medium" onclick="resetWorkHistoryColumns()">Reset Default</button>
+              <span class="text-surface-600 text-xs">|</span>
+              <button class="text-xs text-surface-400 hover:text-white transition-colors" onclick="showColumnSelector = false; renderPage()"><i class="fas fa-times"></i> Close</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            ${Object.keys(workHistoryColumns).map(key => `
+              <label class="flex items-center gap-2.5 text-sm text-surface-300 cursor-pointer hover:text-white select-none py-1.5 px-2 rounded hover:bg-surface-800/50 transition-all">
+                <input type="checkbox" 
+                       class="rounded border-surface-700 bg-surface-800 text-brand-500 focus:ring-brand-500/20 w-4 h-4" 
+                       ${workHistoryColumns[key].visible ? 'checked' : ''} 
+                       onchange="toggleWorkHistoryColumn('${key}')">
+                <span>${workHistoryColumns[key].label}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Filters -->
+      <div class="card mb-4">
+        <div class="flex flex-wrap gap-3">
+          <input type="text" class="form-input py-2 text-sm w-64" placeholder="Search lead, agent, notes..." value="${workHistoryFilter.search}" oninput="handleWorkHistorySearch(this.value)">
+          
+          ${(APP.currentRole === 'admin' || APP.currentRole === 'tl') ? `
+            <select class="form-input py-2 text-sm w-48" onchange="workHistoryFilter.agentId=this.value; renderPage()">
+              <option value="all" ${workHistoryFilter.agentId === 'all' ? 'selected' : ''}>All Agents</option>
+              ${agents.map(a => `<option value="${a.id || a._id}" ${workHistoryFilter.agentId === (a.id || a._id) ? 'selected' : ''}>${a.name}</option>`).join('')}
+            </select>
+          ` : ''}
+
+          <select class="form-input py-2 text-sm w-48" onchange="workHistoryFilter.outcome=this.value; renderPage()">
+            <option value="all" ${workHistoryFilter.outcome === 'all' ? 'selected' : ''}>All Outcomes</option>
+            <option value="answered" ${workHistoryFilter.outcome === 'answered' ? 'selected' : ''}>Answered</option>
+            <option value="not_answered" ${workHistoryFilter.outcome === 'not_answered' ? 'selected' : ''}>Not Answered</option>
+            <option value="busy" ${workHistoryFilter.outcome === 'busy' ? 'selected' : ''}>Busy</option>
+            <option value="wrong_number" ${workHistoryFilter.outcome === 'wrong_number' ? 'selected' : ''}>Wrong Number</option>
+            <option value="callback_requested" ${workHistoryFilter.outcome === 'callback_requested' ? 'selected' : ''}>Callback Requested</option>
+          </select>
+
+          <select class="form-input py-2 text-sm w-48" onchange="workHistoryFilter.priority=this.value; renderPage()">
+            <option value="all" ${workHistoryFilter.priority === 'all' ? 'selected' : ''}>All Priorities</option>
+            <option value="cold" ${workHistoryFilter.priority === 'cold' ? 'selected' : ''}>Cold</option>
+            <option value="warm" ${workHistoryFilter.priority === 'warm' ? 'selected' : ''}>Warm</option>
+            <option value="hot" ${workHistoryFilter.priority === 'hot' ? 'selected' : ''}>Hot</option>
+          </select>
+
+          <select class="form-input py-2 text-sm w-48" onchange="workHistoryFilter.dateRange=this.value; renderPage()">
+            <option value="7" ${workHistoryFilter.dateRange === '7' ? 'selected' : ''}>Last 7 Days</option>
+            <option value="30" ${workHistoryFilter.dateRange === '30' ? 'selected' : ''}>Last 30 Days</option>
+            <option value="90" ${workHistoryFilter.dateRange === '90' ? 'selected' : ''}>Last 90 Days</option>
+            <option value="custom" ${workHistoryFilter.dateRange === 'custom' ? 'selected' : ''}>Custom Range</option>
+            <option value="all" ${workHistoryFilter.dateRange === 'all' ? 'selected' : ''}>All Time</option>
+          </select>
+
+          ${isCustom ? `
+            <div class="flex items-center gap-2">
+              <input type="date" class="form-input py-2 text-xs w-auto" value="${workHistoryFilter.startDate}" onchange="workHistoryFilter.startDate=this.value; renderPage()">
+              <span class="text-surface-500">to</span>
+              <input type="date" class="form-input py-2 text-xs w-auto" value="${workHistoryFilter.endDate}" onchange="workHistoryFilter.endDate=this.value; renderPage()">
+            </div>
+          ` : ''}
+
+          <button class="btn btn-ghost btn-sm" onclick="workHistoryFilter={search:'',agentId:'all',dateRange:'30',startDate:'',endDate:'',outcome:'all',priority:'all'};renderPage()"><i class="fas fa-times"></i> Clear</button>
+        </div>
+      </div>
+
+      <!-- Table Card -->
+      <div class="card p-0 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                ${workHistoryColumns.dateTime.visible ? `<th class="w-36 text-left">Date & Time</th>` : ''}
+                ${workHistoryColumns.agent.visible ? `<th class="text-left">Agent</th>` : ''}
+                ${workHistoryColumns.team.visible ? `<th class="text-left">Team Name</th>` : ''}
+                ${workHistoryColumns.lead.visible ? `<th class="text-left">Lead</th>` : ''}
+                ${workHistoryColumns.phone.visible ? `<th class="text-left">Phone</th>` : ''}
+                ${workHistoryColumns.email.visible ? `<th class="text-left">Email</th>` : ''}
+                ${workHistoryColumns.loanAmount.visible ? `<th class="text-left">Loan Amount</th>` : ''}
+                ${workHistoryColumns.loanType.visible ? `<th class="text-left">Loan Type</th>` : ''}
+                ${workHistoryColumns.leadStatus.visible ? `<th class="text-left">Lead Status</th>` : ''}
+                ${workHistoryColumns.priority.visible ? `<th class="text-left">Priority</th>` : ''}
+                ${workHistoryColumns.aging.visible ? `<th class="text-left">Aging</th>` : ''}
+                ${workHistoryColumns.outcome.visible ? `<th class="text-left">Call Outcome</th>` : ''}
+                ${workHistoryColumns.notes.visible ? `<th class="text-left">Notes</th>` : ''}
+                ${workHistoryColumns.followUp.visible ? `<th class="text-left">Follow-up Due</th>` : ''}
+              </tr>
+            </thead>
+            <tbody id="workHistoryTableBody">
+              ${list.length === 0 ? `
+                <tr>
+                  <td colspan="${visibleColsCount}" class="text-center py-12 text-surface-500">
+                    <div class="flex flex-col items-center justify-center">
+                      <i class="fas fa-phone-slash text-4xl mb-3 text-surface-600"></i>
+                      <p class="font-medium text-surface-400">No call history found</p>
+                      <p class="text-xs text-surface-600 mt-1">Try adjusting your filters or search term</p>
+                    </div>
+                  </td>
+                </tr>
+              ` : list.map(c => {
+                const lead = leads.find(l => l.id === c.lead_id || l._id === c.lead_id);
+                const agent = getUser(c.agent_id);
+                
+                const leadName = lead ? `<span class="text-white hover:underline cursor-pointer font-medium" onclick="showLeadDetail('${lead.id || lead._id}')">${lead.name}</span>` : '<span class="text-surface-500 italic">Unknown Lead</span>';
+                const leadPhone = lead ? lead.phone : '—';
+                const leadEmail = lead ? (lead.email || '—') : '—';
+                const leadStatus = lead ? `<span class="badge ${getStatusBadgeClass(lead.status)}">${STATUS_LABELS[lead.status] || lead.status}</span>` : '—';
+                const loanType = lead ? (LOAN_LABELS[lead.loan_type] || lead.loan_type || '—') : '—';
+                
+                const leadPriorityVal = lead ? (lead.priority || 'cold').toLowerCase().trim() : 'cold';
+                let priorityBadgeClass = 'badge-contacted'; // cold
+                if (leadPriorityVal === 'hot') priorityBadgeClass = 'badge-hot';
+                else if (leadPriorityVal === 'warm') priorityBadgeClass = 'badge-documents-pending';
+                const leadPriority = lead ? `<span class="badge ${priorityBadgeClass}">${PRIORITY_LABELS[leadPriorityVal] || leadPriorityVal}</span>` : '—';
+
+                const agentName = agent ? agent.name : '<span class="text-surface-500 italic">Unknown Agent</span>';
+                const teamId = agent ? (agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : agent.team_id) : null;
+                const team = getTeam(teamId);
+                const teamName = team ? team.name : '—';
+                
+                const formattedTime = new Date(c.created_at).toLocaleString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+
+                const outcomeBadge = `<span class="badge ${getOutcomeBadgeClass(c.outcome)}">${OUTCOME_LABELS[c.outcome] || c.outcome}</span>`;
+                const followUpBadge = c.follow_up_at ? `<span class="badge badge-documents-pending"><i class="fas fa-calendar-alt mr-1 text-[10px]"></i> ${new Date(c.follow_up_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>` : '—';
+                
+                return `
+                  <tr class="hover:bg-surface-800/30">
+                    ${workHistoryColumns.dateTime.visible ? `<td class="text-surface-400 whitespace-nowrap text-xs">${formattedTime}</td>` : ''}
+                    ${workHistoryColumns.agent.visible ? `<td class="text-white font-medium whitespace-nowrap">${agentName}</td>` : ''}
+                    ${workHistoryColumns.team.visible ? `<td class="text-surface-400 whitespace-nowrap text-sm">${teamName}</td>` : ''}
+                    ${workHistoryColumns.lead.visible ? `<td class="text-white whitespace-nowrap">${leadName}</td>` : ''}
+                    ${workHistoryColumns.phone.visible ? `<td class="text-surface-400 whitespace-nowrap text-sm">${leadPhone}</td>` : ''}
+                    ${workHistoryColumns.email.visible ? `<td class="text-surface-400 whitespace-nowrap text-sm">${leadEmail}</td>` : ''}
+                    ${workHistoryColumns.loanAmount.visible ? `<td class="font-medium text-white whitespace-nowrap">${lead ? formatCurrency(lead.amount_requested) : '—'}</td>` : ''}
+                    ${workHistoryColumns.loanType.visible ? `<td class="text-surface-400 whitespace-nowrap text-sm capitalize">${loanType}</td>` : ''}
+                    ${workHistoryColumns.leadStatus.visible ? `<td class="whitespace-nowrap">${leadStatus}</td>` : ''}
+                    ${workHistoryColumns.priority.visible ? `<td class="whitespace-nowrap">${leadPriority}</td>` : ''}
+                    ${workHistoryColumns.aging.visible ? `<td class="text-surface-400 whitespace-nowrap text-sm">${lead ? getAging(lead.assigned_at) : '—'}</td>` : ''}
+                    ${workHistoryColumns.outcome.visible ? `<td class="whitespace-nowrap">${outcomeBadge}</td>` : ''}
+                    ${workHistoryColumns.notes.visible ? `<td class="text-surface-300 text-sm max-w-xs truncate" title="${c.notes || ''}">${c.notes || '—'}</td>` : ''}
+                    ${workHistoryColumns.followUp.visible ? `<td class="whitespace-nowrap">${followUpBadge}</td>` : ''}
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 // ========== MODALS & ACTIONS ==========
 function showAddMemberModal() {
   document.getElementById('memberEditId').value = '';
@@ -2326,11 +4744,9 @@ async function handleLeadSubmit(e) {
     }
 
     // Refresh leads list
-    const leadsData = await fetchAPI('/leads');
-    setLeads(leadsData);
+    await fetchLeads();
     
     closeModal('addLeadModal');
-    renderPage();
     updateUserUI();
   } catch (err) {
     // Error handled by fetchAPI toast
@@ -3171,6 +5587,5 @@ function init() {
 initTheme();
 init();
 </script>
-
 </body>
 </html>

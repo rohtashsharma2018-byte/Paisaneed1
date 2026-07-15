@@ -39,6 +39,13 @@ const leadSchema = new mongoose.Schema({
   updated_at: { type: Date, default: Date.now }
 });
 
+leadSchema.index({ created_at: -1 });
+leadSchema.index({ assigned_agent_id: 1, created_at: -1 });
+leadSchema.index({ status: 1 });
+leadSchema.index({ loan_type: 1 });
+leadSchema.index({ source: 1 });
+leadSchema.index({ name: 'text', phone: 'text', email: 'text' });
+
 const teamSchema = new mongoose.Schema({
   name: { type: String, required: true },
   leader_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
