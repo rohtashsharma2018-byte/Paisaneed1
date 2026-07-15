@@ -536,9 +536,9 @@ app.post('/api/restore', authenticate, async (req, res) => {
   }
 });
 
-// Serve index.html for any other route
+// Serve Index.html for any other route
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'Index.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {
