@@ -405,6 +405,9 @@ body.light-theme #loginOverlay > div {
         </div>
       </div>
       <div class="flex items-center gap-3">
+        <button class="btn-ghost rounded-lg" onclick="handleRefresh()" id="refreshBtn" title="Refresh Data">
+          <i class="fas fa-sync-alt text-lg"></i>
+        </button>
         <button class="btn-ghost rounded-lg relative" onclick="toggleNotifications()">
           <i class="fas fa-bell text-lg"></i>
           <span class="notif-dot" id="notifDot"></span>
@@ -3684,6 +3687,7 @@ function renderReports() {
             <thead>
               <tr class="border-b border-surface-700">
                 <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Team Name</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">No. of Agents</th>
                 <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Leads Assigned</th>
                 <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Calls Made</th>
                 <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Disbursed Leads</th>
@@ -3713,13 +3717,14 @@ function renderReports() {
                   const aConversion = aLeads.length > 0 ? ((aDisbursed.length / aLeads.length) * 100).toFixed(1) : 0;
                   const targetAmt = TARGETS.teams[team.id] || 0;
                   const targetPct = targetAmt > 0 ? ((aDisbursedAmount / targetAmt) * 100).toFixed(1) : 0;
-                  return { name: team.name, leads: aLeads.length, calls: aTotalCalls, disbursed: aDisbursed.length, amount: aDisbursedAmount, target: targetAmt, targetPct: targetPct, conversion: aConversion };
+                  return { name: team.name, agentsCount: teamAgents.length, leads: aLeads.length, calls: aTotalCalls, disbursed: aDisbursed.length, amount: aDisbursedAmount, target: targetAmt, targetPct: targetPct, conversion: aConversion };
                 });
                 teamStats.sort((a, b) => b.amount - a.amount || b.conversion - a.conversion);
-                if (teamStats.length === 0) return '<tr><td colspan="8" class="py-8 text-center text-surface-500">No data available</td></tr>';
+                if (teamStats.length === 0) return '<tr><td colspan="9" class="py-8 text-center text-surface-500">No data available</td></tr>';
                 return teamStats.map(m => `
                   <tr class="border-b border-surface-800/50 hover:bg-surface-800/20 transition-colors">
                     <td class="py-3 px-4 text-white font-medium">${m.name}</td>
+                    <td class="py-3 px-4 text-surface-400 font-medium">${m.agentsCount}</td>
                     <td class="py-3 px-4 text-surface-300">${m.leads}</td>
                     <td class="py-3 px-4 text-surface-300">${m.calls}</td>
                     <td class="py-3 px-4 text-emerald-400 font-medium">${m.disbursed}</td>
@@ -3742,6 +3747,7 @@ function renderReports() {
             <thead>
               <tr class="border-b border-surface-700">
                 <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Agent Name</th>
+                <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Team</th>
                 <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Leads Assigned</th>
                 <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Calls Made</th>
                 <th class="py-3 px-4 font-semibold text-surface-400 text-sm">Disbursed Leads</th>
@@ -3770,13 +3776,16 @@ function renderReports() {
                   const aConversion = aLeads.length > 0 ? ((aDisbursed.length / aLeads.length) * 100).toFixed(1) : 0;
                   const targetAmt = TARGETS.agents[agent.id] || 0;
                   const targetPct = targetAmt > 0 ? ((aDisbursedAmount / targetAmt) * 100).toFixed(1) : 0;
-                  return { name: agent.name, leads: aLeads.length, calls: aTotalCalls, disbursed: aDisbursed.length, amount: aDisbursedAmount, target: targetAmt, targetPct: targetPct, conversion: aConversion };
+                  const teamId = typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : agent.team_id;
+                  const teamName = TEAMS.find(t => t.id === teamId)?.name || 'N/A';
+                  return { name: agent.name, teamName: teamName, leads: aLeads.length, calls: aTotalCalls, disbursed: aDisbursed.length, amount: aDisbursedAmount, target: targetAmt, targetPct: targetPct, conversion: aConversion };
                 });
                 memberStats.sort((a, b) => b.amount - a.amount || b.conversion - a.conversion);
-                if (memberStats.length === 0) return '<tr><td colspan="8" class="py-8 text-center text-surface-500">No data available</td></tr>';
+                if (memberStats.length === 0) return '<tr><td colspan="9" class="py-8 text-center text-surface-500">No data available</td></tr>';
                 return memberStats.map(m => `
                   <tr class="border-b border-surface-800/50 hover:bg-surface-800/20 transition-colors">
                     <td class="py-3 px-4 text-white font-medium">${m.name}</td>
+                    <td class="py-3 px-4 text-surface-400 text-xs">${m.teamName}</td>
                     <td class="py-3 px-4 text-surface-300">${m.leads}</td>
                     <td class="py-3 px-4 text-surface-300">${m.calls}</td>
                     <td class="py-3 px-4 text-emerald-400 font-medium">${m.disbursed}</td>
@@ -5536,6 +5545,30 @@ async function saveTargets() {
   } catch (err) {
     console.error(err);
     toast('Failed to save targets', 'error');
+  }
+}
+
+async function handleRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  const icon = btn.querySelector('i');
+  
+  btn.disabled = true;
+  icon.classList.add('fa-spin');
+  
+  const originalPage = APP.currentPage;
+  
+  try {
+    await initApp();
+    if (originalPage) {
+      navigateTo(originalPage);
+    }
+    toast('Data refreshed successfully');
+  } catch (err) {
+    console.error('Refresh failed:', err);
+    toast('Failed to refresh data', 'error');
+  } finally {
+    btn.disabled = false;
+    icon.classList.remove('fa-spin');
   }
 }
 
