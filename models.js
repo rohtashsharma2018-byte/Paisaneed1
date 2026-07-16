@@ -72,8 +72,27 @@ const callLogSchema = new mongoose.Schema({
   created_at: { type: Date, default: Date.now }
 });
 
+const emailTemplateSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  subject: { type: String, required: true },
+  body: { type: String, required: true },
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now }
+});
+
+const emailLogSchema = new mongoose.Schema({
+  lead_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Lead', required: true },
+  agent_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  to: { type: String, required: true },
+  subject: { type: String, required: true },
+  body: { type: String, required: true },
+  created_at: { type: Date, default: Date.now }
+});
+
 export const User = mongoose.model('User', userSchema);
 export const Lead = mongoose.model('Lead', leadSchema);
 export const Team = mongoose.model('Team', teamSchema);
 export const Setting = mongoose.model('Setting', settingSchema);
 export const CallLog = mongoose.model('CallLog', callLogSchema);
+export const EmailTemplate = mongoose.model('EmailTemplate', emailTemplateSchema);
+export const EmailLog = mongoose.model('EmailLog', emailLogSchema);

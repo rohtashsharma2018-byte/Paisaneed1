@@ -4,8 +4,9 @@ import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
-import { User, Lead, Team, Setting, CallLog } from './models.js';
+import { User, Lead, Team, Setting, CallLog, EmailTemplate, EmailLog } from './models.js';
 import bcrypt from 'bcryptjs';
+import { Resend } from 'resend';
 
 dotenv.config();
 
@@ -255,18 +256,42 @@ app.post('/api/leads/import', authenticate, async (req, res) => {
     const { leads, confirm } = req.body;
     if (!Array.isArray(leads)) return res.status(400).json({ message: 'Invalid data format' });
 
-    // First pass: identify duplicates
+    // First pass: identify duplicates (both in DB and within the import file)
     const toImport = [];
     const duplicates = [];
+    const seenPhones = new Set();
+    const seenEmails = new Set();
+
     for (const leadData of leads) {
-      const query = { $or: [{ phone: leadData.phone || leadData.Phone }] };
-      if (leadData.email || leadData.Email) query.$or.push({ email: leadData.email || leadData.Email });
+      const phone = leadData.phone || leadData.Phone;
+      const email = leadData.email || leadData.Email;
+
+      if (!phone) {
+        // Assume phone is mandatory, skip or treat as error
+        continue;
+      }
+
+      // Check for duplicates in the current import file
+      let isDuplicateInFile = seenPhones.has(phone);
+      if (email && seenEmails.has(email)) {
+        isDuplicateInFile = true;
+      }
+
+      if (isDuplicateInFile) {
+        duplicates.push(leadData);
+        continue;
+      }
+
+      const query = { $or: [{ phone }] };
+      if (email) query.$or.push({ email });
       
       const duplicate = await Lead.findOne(query);
       if (duplicate) {
         duplicates.push(leadData);
       } else {
         toImport.push(leadData);
+        seenPhones.add(phone);
+        if (email) seenEmails.add(email);
       }
     }
 
@@ -282,7 +307,7 @@ app.post('/api/leads/import', authenticate, async (req, res) => {
           phone: leadData.phone || leadData.Phone,
           email: leadData.email || leadData.Email,
           city: leadData.city || leadData.City,
-          loan_type: leadData.loantype || leadData['loan type'] || leadData['Loan Type'] || 'personal',
+          loan_type: leadData.loantype || leadData['loan type'] || leadData['Loan Type'] || 'personal_loan',
           amount_requested: parseInt((leadData.amount || leadData.Amount || '0').toString().replace(/[^0-9]/g, '')) || 0,
           source: leadData.source || leadData.Source || 'website',
           status: ((leadData.status !== undefined ? leadData.status : (leadData.Status !== undefined ? leadData.Status : 'new')) || 'new').toString().toLowerCase().trim(),
@@ -343,6 +368,7 @@ app.delete('/api/leads/:id', authenticate, async (req, res) => {
     // 1. Delete lead and call logs
     await Lead.findByIdAndDelete(req.params.id);
     await CallLog.deleteMany({ lead_id: req.params.id });
+    await EmailLog.deleteMany({ lead_id: req.params.id });
 
     // 2. Remove related allocation history
     const historySetting = await Setting.findOne({ key: 'allocation_history' });
@@ -404,6 +430,24 @@ app.get('/api/calls', authenticate, async (req, res) => {
     }
     const calls = await CallLog.find(query).sort({ created_at: -1 });
     res.json(calls);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.get('/api/emails', authenticate, async (req, res) => {
+  try {
+    let query = {};
+    if (req.user.role === 'tl' && req.user.team_id) {
+      const agents = await User.find({ team_id: req.user.team_id }).select('_id');
+      const agentIds = agents.map(a => a._id);
+      agentIds.push(req.user.id);
+      query = { agent_id: { $in: agentIds } };
+    } else if (req.user.role === 'agent') {
+      query = { agent_id: req.user.id };
+    }
+    const emails = await EmailLog.find(query).sort({ created_at: -1 });
+    res.json(emails);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -476,6 +520,94 @@ app.delete('/api/users/:id', authenticate, async (req, res) => {
   try {
     await User.findByIdAndDelete(req.params.id);
     res.json({ message: 'User deleted' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// --- EMAIL TEMPLATES ROUTES ---
+app.get('/api/email-templates', authenticate, async (req, res) => {
+  try {
+    const templates = await EmailTemplate.find().sort({ name: 1 });
+    res.json(templates);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.post('/api/email-templates', authenticate, async (req, res) => {
+  try {
+    const template = new EmailTemplate(req.body);
+    await template.save();
+    res.status(201).json(template);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+app.put('/api/email-templates/:id', authenticate, async (req, res) => {
+  try {
+    const template = await EmailTemplate.findByIdAndUpdate(req.params.id, { ...req.body, updated_at: Date.now() }, { new: true });
+    res.json(template);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+app.delete('/api/email-templates/:id', authenticate, async (req, res) => {
+  try {
+    await EmailTemplate.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Template deleted' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// --- SEND EMAIL ROUTE ---
+app.post('/api/send-email', authenticate, async (req, res) => {
+  try {
+    const { to, subject, html, leadId } = req.body;
+    
+    if (!process.env.RESEND_API_KEY) {
+      return res.status(500).json({ message: 'Resend API Key not configured' });
+    }
+
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    
+    const { data, error } = await resend.emails.send({
+      from: 'CRM <onboarding@resend.dev>', // Default Resend test address
+      to: [to],
+      subject: subject,
+      html: html,
+    });
+
+    if (error) {
+      return res.status(400).json({ message: error.message || 'Failed to send email' });
+    }
+
+    let savedLog = null;
+    // Save log if leadId is provided
+    if (leadId) {
+      const log = new EmailLog({
+        lead_id: leadId,
+        agent_id: req.user.id,
+        to,
+        subject,
+        body: html
+      });
+      savedLog = await log.save();
+    }
+
+    res.json({ message: 'Email sent successfully', data, log: savedLog });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.get('/api/email-logs/:leadId', authenticate, async (req, res) => {
+  try {
+    const logs = await EmailLog.find({ lead_id: req.params.leadId }).sort({ created_at: -1 });
+    res.json(logs);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -288,15 +288,14 @@ body.light-theme #loginOverlay > div {
   <div class="w-full max-w-md p-8 bg-surface-900 border border-surface-800 rounded-2xl shadow-2xl">
     <div class="text-center mb-8">
       <div class="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-        <i class="fas fa-hand-holding-usd text-2xl text-white"></i>
+        <i class="fas fa-users text-2xl text-white"></i>
       </div>
-      <h1 class="font-display font-bold text-2xl text-white">PaisaNeed CRM</h1>
-      <p class="text-surface-400 mt-2">Enter your credentials to continue</p>
+      <h1 class="font-display font-bold text-2xl text-white">CRM System</h1>
     </div>
     <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
       <div>
         <label class="block text-sm font-medium text-surface-400 mb-1.5">Email Address</label>
-        <input type="email" id="loginEmail" class="form-input" required placeholder="admin@paisaneed.com">
+        <input type="email" id="loginEmail" class="form-input" required>
       </div>
       <div>
         <label class="block text-sm font-medium text-surface-400 mb-1.5">Password</label>
@@ -311,9 +310,6 @@ body.light-theme #loginOverlay > div {
         <i class="fas fa-sign-in-alt"></i> Sign In
       </button>
     </form>
-    <div class="mt-6 text-center">
-      <p class="text-xs text-surface-500">Demo: admin@paisaneed.com / admin123</p>
-    </div>
   </div>
 </div>
 
@@ -323,7 +319,7 @@ body.light-theme #loginOverlay > div {
   <div class="p-5 border-b border-surface-800 logo-container">
     <div class="flex items-center gap-3">
       <div class="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center shrink-0">
-        <i class="fas fa-coins text-white text-sm"></i>
+        <i class="fas fa-users text-white text-sm"></i>
       </div>
       <div class="logo-text">
         <h1 class="font-display font-bold text-base text-white leading-tight">CRM System</h1>
@@ -347,8 +343,8 @@ body.light-theme #loginOverlay > div {
       <i class="fas fa-phone-alt"></i><span>Calling Queue</span>
       <span class="ml-auto bg-brand-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full" id="callingCount">0</span>
     </div>
-    <div class="sidebar-link" data-page="workHistory" onclick="navigateTo('workHistory')">
-      <i class="fas fa-history"></i><span>Work History</span>
+    <div class="sidebar-link" data-page="footprints" onclick="navigateTo('footprints')">
+      <i class="fas fa-shoe-prints"></i><span>Footprints</span>
     </div>
     <div class="sidebar-link" data-page="reports" onclick="navigateTo('reports')">
       <i class="fas fa-chart-line"></i><span>Reports</span>
@@ -364,11 +360,6 @@ body.light-theme #loginOverlay > div {
 
     <div class="sidebar-link" data-page="settings" onclick="navigateTo('settings')" id="navSettings" style="display:none">
       <i class="fas fa-cog"></i><span>Settings</span>
-    </div>
-
-    <!-- Collapse Sidebar Option -->
-    <div class="sidebar-link hidden lg:flex mt-6 border-t border-surface-800/60 pt-4" onclick="toggleSidebar()" title="Collapse Sidebar">
-      <i class="fas fa-angle-double-left text-surface-500"></i><span class="text-surface-400 font-medium">Collapse Menu</span>
     </div>
   </div>
 
@@ -638,6 +629,10 @@ body.light-theme #loginOverlay > div {
         <label class="block text-sm font-medium text-surface-400 mb-1.5">Source Key (lowercase, no spaces) *</label>
         <input type="text" class="form-input" id="sourceKey" required placeholder="linkedin">
       </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Display Name *</label>
+        <input type="text" class="form-input" id="sourceDisplayName" required placeholder="LinkedIn">
+      </div>
       <div class="flex justify-end gap-3 pt-2">
         <button type="button" class="btn btn-secondary" onclick="closeModal('addSourceModal')">Cancel</button>
         <button type="submit" class="btn btn-primary" id="sourceSubmitBtn">Add Source</button>
@@ -845,7 +840,7 @@ body.light-theme #loginOverlay > div {
       <div id="csvDropZone" class="border-2 border-dashed border-surface-700 rounded-xl p-10 text-center hover:border-brand-500 hover:bg-brand-600/5 transition-all duration-200 cursor-pointer" onclick="document.getElementById('csvInput').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleCSVDrop(event)">
         <i class="fas fa-cloud-upload-alt text-4xl text-surface-500 mb-3"></i>
         <p class="text-white font-medium">Drop CSV file here or click to browse</p>
-        <p class="text-surface-500 text-sm mt-1">Supports .csv files with columns: name, phone, email, city, loan_type, amount, source</p>
+        <p class="text-surface-500 text-sm mt-1">Supports .csv files with columns: name, phone, email, city, loan_type, amount, source, status</p>
       </div>
       <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSVImport(event)">
       <div id="importPreview" class="mt-4 hidden">
@@ -893,6 +888,86 @@ body.light-theme #loginOverlay > div {
   </div>
 </div>
 
+<!-- Email Template Modal -->
+<div class="modal-overlay" id="emailTemplateModal">
+  <div class="modal" style="max-width:500px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white" id="emailTemplateModalTitle">Add Email Template</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('emailTemplateModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="emailTemplateForm" class="p-6 space-y-4" onsubmit="handleEmailTemplateSubmit(event)">
+      <input type="hidden" id="emailTemplateEditId">
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Template Name *</label>
+        <input type="text" class="form-input" id="et_name" required placeholder="Welcome Email">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Subject *</label>
+        <input type="text" class="form-input" id="et_subject" required placeholder="Welcome to Paisaneed CRM">
+      </div>
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <label class="block text-sm font-medium text-surface-400">Body (HTML allowed) *</label>
+          <div class="flex flex-wrap justify-end gap-1.5 max-w-sm">
+            <button type="button" class="px-1.5 py-0.5 rounded text-[10px] bg-surface-800 text-brand-400 hover:bg-brand-500 hover:text-white transition-colors" onclick="insertPlaceholder('{{name}}', 'et_body')">{{name}}</button>
+            <button type="button" class="px-1.5 py-0.5 rounded text-[10px] bg-surface-800 text-brand-400 hover:bg-brand-500 hover:text-white transition-colors" onclick="insertPlaceholder('{{loan_type}}', 'et_body')">{{loan_type}}</button>
+            <button type="button" class="px-1.5 py-0.5 rounded text-[10px] bg-surface-800 text-brand-400 hover:bg-brand-500 hover:text-white transition-colors" onclick="insertPlaceholder('{{amount}}', 'et_body')">{{amount}}</button>
+            <button type="button" class="px-1.5 py-0.5 rounded text-[10px] bg-surface-800 text-brand-400 hover:bg-brand-500 hover:text-white transition-colors" onclick="insertPlaceholder('{{status}}', 'et_body')">{{status}}</button>
+            <button type="button" class="px-1.5 py-0.5 rounded text-[10px] bg-surface-800 text-brand-400 hover:bg-brand-500 hover:text-white transition-colors" onclick="insertPlaceholder('{{phone}}', 'et_body')">{{phone}}</button>
+            <button type="button" class="px-1.5 py-0.5 rounded text-[10px] bg-surface-800 text-brand-400 hover:bg-brand-500 hover:text-white transition-colors" onclick="insertPlaceholder('{{email}}', 'et_body')">{{email}}</button>
+            <button type="button" class="px-1.5 py-0.5 rounded text-[10px] bg-surface-800 text-brand-400 hover:bg-brand-500 hover:text-white transition-colors" onclick="insertPlaceholder('{{agent_name}}', 'et_body')">{{agent_name}}</button>
+          </div>
+        </div>
+        <textarea class="form-input min-h-[200px] font-mono text-xs" id="et_body" required placeholder="Hello {{name}}, welcome to our system..."></textarea>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('emailTemplateModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="emailTemplateSubmitBtn">Save Template</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Send Email Modal -->
+<div class="modal-overlay" id="sendEmailModal">
+  <div class="modal" style="max-width:600px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white">Send Email</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('sendEmailModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="sendEmailForm" class="p-6 space-y-4" onsubmit="handleSendEmailSubmit(event)">
+      <input type="hidden" id="se_leadId">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">To *</label>
+          <input type="email" class="form-input" id="se_to" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">Select Template</label>
+          <select class="form-input" id="se_templateSelect" onchange="applyEmailTemplate(this.value)">
+            <option value="">Draft New (Manual)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Subject *</label>
+        <input type="text" class="form-input" id="se_subject" required placeholder="Enter email subject">
+      </div>
+      <div>
+        <div class="flex justify-between items-center mb-1.5">
+          <label class="block text-sm font-medium text-surface-400">Message (HTML) *</label>
+          <span id="se_wordCount" class="text-xs text-surface-500">Words: 0</span>
+        </div>
+        <textarea class="form-input min-h-[250px]" id="se_body" required placeholder="Type your message here..." oninput="updateWordCount()"></textarea>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('sendEmailModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="sendEmailSubmitBtn"><i class="fas fa-paper-plane mr-2"></i> Send Email</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Change Password Modal -->
 <div class="modal-overlay" id="changePasswordModal">
   <div class="modal" style="max-width:400px">
@@ -931,6 +1006,7 @@ body.light-theme #loginOverlay > div {
 // ========== STATE ==========
 const APP = {
   currentPage: 'dashboard',
+  currentFootprintTab: 'workHistory',
   currentPaginationPage: 1,
   currentRole: 'admin',
   currentUserId: null,
@@ -986,16 +1062,19 @@ function initTheme() {
 let TEAMS = [];
 let USERS = [];
 let LOAN_TYPES = [];
-let LOAN_LABELS = { personal: 'Personal Loan', home: 'Home Loan', business: 'Business Loan', lap: 'Loan Against Property', credit_card: 'Credit Card' };
+let LOAN_LABELS = { personal_loan: 'Personal Loan', home_loan: 'Home Loan', business_loan: 'Business Loan', car_loan: 'Car Loan', education_loan: 'Education Loan', lap: 'Loan Against Property', credit_card: 'Credit Card' };
 let STATUSES = ['new', 'contacted', 'interested', 'documents_pending', 'login_done', 'disbursed', 'rejected', 'not_interested', 'dead'];
 let STATUS_LABELS = { new: 'New', contacted: 'Contacted', interested: 'Interested', documents_pending: 'Docs Pending', login_done: 'Login Done', disbursed: 'Disbursed', rejected: 'Rejected', not_interested: 'Not Interested', dead: 'Dead' };
 let PRIORITIES = ['cold', 'warm', 'hot'];
 let PRIORITY_LABELS = { cold: 'Cold', warm: 'Warm', hot: 'Hot' };
 let SOURCES = [];
+let SOURCE_LABELS = {};
 
 let leads = [];
 let selectedLeadIds = [];
 let callLogs = [];
+let emailLogs = [];
+let EMAIL_TEMPLATES = [];
 let allocationHistory = [];
 let NOTIFICATIONS = [];
 let TARGETS = { teams: {}, agents: {} };
@@ -1205,9 +1284,9 @@ async function initApp() {
 
     const [
       leadsData, usersData, teamsData, loanTypesData, sourcesData, distRulesData,
-      allocHistoryData, callsData, loanLabelsData, companyProfileData,
+      allocHistoryData, callsData, emailsData, loanLabelsData, companyProfileData,
       leadStatusesData, leadStatusLabelsData, leadPrioritiesData, leadPriorityLabelsData,
-      targetsData
+      targetsData, emailTemplatesData
     ] = await Promise.all([
       fetchAPI(buildLeadsUrl()),
       fetchAPI('/users'),
@@ -1217,21 +1296,25 @@ async function initApp() {
       fetchAPI('/settings/distribution_rules'),
       fetchAPI('/settings/allocation_history').catch(() => []),
       fetchAPI('/calls').catch(() => []),
+      fetchAPI('/emails').catch(() => []),
       fetchAPI('/settings/loan_labels').catch(() => ({})),
       fetchAPI('/settings/company_profile').catch(() => ({})),
       fetchAPI('/settings/lead_statuses').catch(() => []),
       fetchAPI('/settings/lead_status_labels').catch(() => ({})),
       fetchAPI('/settings/lead_priorities').catch(() => []),
       fetchAPI('/settings/lead_priority_labels').catch(() => ({})),
-      fetchAPI('/settings/targets').catch(() => ({}))
+      fetchAPI('/settings/targets').catch(() => ({})),
+      fetchAPI('/email-templates').catch(() => [])
     ]);
     
     setLeads(leadsData);
     USERS = (usersData || []).map(u => ({ ...u, id: u._id }));
     TEAMS = (teamsData || []).map(t => ({ ...t, id: t._id }));
+    EMAIL_TEMPLATES = (emailTemplatesData || []).map(t => ({ ...t, id: t._id }));
     allocationHistory = Array.isArray(allocHistoryData) ? allocHistoryData : [];
     callLogs = Array.isArray(callsData) ? callsData : [];
-    LOAN_TYPES = loanTypesData && loanTypesData.length > 0 ? loanTypesData : ['personal', 'home', 'business', 'lap', 'credit_card'];
+    emailLogs = Array.isArray(emailsData) ? emailsData : [];
+    LOAN_TYPES = loanTypesData && loanTypesData.length > 0 ? loanTypesData : ['personal_loan', 'home_loan', 'business_loan', 'car_loan', 'education_loan', 'lap', 'credit_card'];
     if (loanLabelsData && typeof loanLabelsData === 'object' && !Array.isArray(loanLabelsData)) {
       LOAN_LABELS = { ...LOAN_LABELS, ...loanLabelsData };
     }
@@ -1388,6 +1471,7 @@ async function bulkDeleteLeads() {
         await fetchAPI(`/leads/${id}`, { method: 'DELETE' });
         leads = leads.filter(l => l.id !== id && l._id !== id);
         callLogs = callLogs.filter(c => c.lead_id !== id);
+        emailLogs = emailLogs.filter(e => e.lead_id !== id);
         successCount++;
       } catch (err) {
         console.error(`Failed to delete lead ${id}`, err);
@@ -1633,7 +1717,7 @@ function renderPage() {
     case 'leads': c.innerHTML = renderLeads(); break;
     case 'pipeline': c.innerHTML = renderPipeline(); break;
     case 'calling': c.innerHTML = renderCallingQueue(); break;
-    case 'workHistory': c.innerHTML = renderWorkHistory(); break;
+    case 'footprints': c.innerHTML = renderFootprints(); break;
     case 'reports': c.innerHTML = renderReports(); break;
     case 'team': c.innerHTML = renderTeam(); break;
     case 'allocations': c.innerHTML = renderAllocations(); break;
@@ -2184,7 +2268,7 @@ function renderLeads() {
           <button class="btn btn-secondary btn-sm" onclick="exportLeadsCSV()"><i class="fas fa-download"></i> Export CSV</button>
            <button class="btn btn-secondary btn-sm" onclick="downloadCSVTemplate()"><i class="fas fa-file-download"></i> Download Template</button>
            ${canManage ? `<button class="btn btn-secondary btn-sm" onclick="openModal('importModal')"><i class="fas fa-file-import"></i> Import CSV</button>` : ''}
-          <button class="btn btn-primary btn-sm" onclick="showAddLeadModal()"><i class="fas fa-plus"></i> Add Lead</button>
+          
         </div>
       </div>
 
@@ -2274,7 +2358,7 @@ function renderLeadRow(l, canManage) {
     <td><span class="text-sm">${LOAN_LABELS[l.loan_type] || l.loan_type}</span></td>
     <td class="font-medium text-white">${formatCurrency(l.amount_requested)}</td>
     <td><span class="${getStatusBadgeClass(l.status || 'new')}">${STATUS_LABELS[l.status] || l.status || '—'}</span></td>
-    <td class="text-sm text-surface-400">${l.source || '—'}</td>
+    <td class="text-sm text-surface-400">${l.source ? (SOURCE_LABELS[l.source] || l.source.charAt(0).toUpperCase() + l.source.slice(1)) : '—'}</td>
     ${canManage ? `<td class="text-sm text-surface-400">${getUser(l.assigned_agent_id)?.name || 'Unassigned'}</td>` : ''}
     <td class="text-sm">
       <span class="text-surface-400">${getAging(l.assigned_at)}</span>
@@ -2295,9 +2379,10 @@ function renderLeadRow(l, canManage) {
     </td>
     <td>
       <div class="flex gap-1">
-        <button class="btn-ghost rounded text-xs text-blue-600" onclick="showLeadDetail('${l.id}')" title="View"><i class="fas fa-eye"></i></button>
+        <button class="btn-ghost rounded text-xs text-blue-600 ${!l.assigned_agent_id ? 'opacity-30 pointer-events-none' : ''}" onclick="showLeadDetail('${l.id}')" title="View"><i class="fas fa-eye"></i></button>
         ${APP.currentRole !== 'agent' ? `<button class="btn-ghost rounded text-xs text-red-600" onclick="showEditLeadModal('${l.id}')" title="Edit"><i class="fas fa-edit"></i></button>` : ''}
-        <button class="btn-ghost rounded text-xs text-brand-400" onclick="showCallLogModal('${l.id}')" title="Log Call"><i class="fas fa-phone-alt"></i></button>
+        <button class="btn-ghost rounded text-xs text-brand-400 ${!l.assigned_agent_id ? 'opacity-30 pointer-events-none' : ''}" onclick="showCallLogModal('${l.id}')" title="Log Call"><i class="fas fa-phone-alt"></i></button>
+        ${l.email ? `<button class="btn-ghost rounded text-xs text-emerald-500 ${!l.assigned_agent_id ? 'opacity-30 pointer-events-none' : ''}" onclick="showSendEmailModal('${l.id}')" title="Send Email"><i class="fas fa-envelope"></i></button>` : ''}
         ${canManage ? `<button class="btn-ghost rounded text-xs text-amber-400" onclick="showReassignModal('${l.id}')" title="Reassign"><i class="fas fa-exchange-alt"></i></button>` : ''}
       </div>
     </td>
@@ -2538,7 +2623,7 @@ function renderTeam() {
                     </div>
                   </td>
                   <td class="capitalize text-sm">
-                    ${u.role === 'tl' ? '<span class="badge badge-interested">Team Leader</span>' : '<span class="badge badge-documents-pending">Agent</span>'}
+                    ${u.role === 'admin' ? '<span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc;">Admin</span>' : u.role === 'tl' ? '<span class="badge badge-interested">Team Leader</span>' : '<span class="badge badge-documents-pending">Agent</span>'}
                   </td>
                   <td class="text-surface-400 text-sm">${team ? team.name : '—'}</td>
                   <td class="text-surface-400 text-sm">${u.email}</td>
@@ -2582,7 +2667,7 @@ function renderTeam() {
                   <p class="font-semibold text-white">${u.name}</p>
                   ${!u.active ? '<span class="badge badge-dead">Inactive</span>' : ''}
                 </div>
-                <p class="text-xs text-surface-500 capitalize">${u.role === 'tl' ? 'Team Leader' : 'Agent'} ${team ? '— ' + team.name : ''}</p>
+                <p class="text-xs text-surface-500 capitalize">${u.role === 'admin' ? 'Admin' : u.role === 'tl' ? 'Team Leader' : 'Agent'} ${team ? '— ' + team.name : ''}</p>
                 <p class="text-xs text-surface-500 mt-0.5">${u.email}</p>
                 <div class="grid grid-cols-3 gap-2 mt-3">
                   <div class="bg-surface-800/50 rounded-lg p-2 text-center">
@@ -2909,6 +2994,9 @@ function renderSettings() {
         <button onclick="changeSettingsTab('system')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'system' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
           <i class="fas fa-database"></i> Automation & Backup
         </button>
+        <button onclick="changeSettingsTab('emails')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'emails' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-envelope"></i> Email Templates
+        </button>
         <button onclick="changeSettingsTab('targets')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'targets' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
           <i class="fas fa-bullseye"></i> Targets
         </button>
@@ -3018,7 +3106,8 @@ function renderSettings() {
             <div class="flex flex-wrap gap-2">
               ${SOURCES.map(s => `
                 <div class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-800 rounded-full text-sm text-surface-300">
-                  <span>${s.charAt(0).toUpperCase() + s.slice(1)}</span>
+                  <span>${SOURCE_LABELS[s] || s.charAt(0).toUpperCase() + s.slice(1)}</span>
+                  <button class="text-xs text-surface-500 hover:text-blue-400 mr-1 focus:outline-none" onclick="openEditSourceModal('${s}')" title="Edit Source"><i class="fas fa-edit"></i></button>
                   <button class="text-xs text-surface-500 hover:text-rose-400 ml-1 focus:outline-none" onclick="deleteSource('${s}')" title="Delete Source"><i class="fas fa-times"></i></button>
                 </div>
               `).join('')}
@@ -3186,6 +3275,35 @@ function renderSettings() {
             </div>
           </div>
         ` : ''}
+
+        ${APP.activeSettingsTab === 'emails' ? `
+          <div class="card">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-display font-semibold text-white">Email Templates</h3>
+              <button class="btn btn-secondary btn-sm" onclick="showAddEmailTemplateModal()"><i class="fas fa-plus"></i> Add Template</button>
+            </div>
+            <div class="space-y-3">
+              ${EMAIL_TEMPLATES.map(t => `
+                <div class="flex items-center justify-between p-3 bg-surface-800/30 rounded-xl border border-surface-700/50">
+                  <div class="flex items-center gap-3 overflow-hidden">
+                    <div class="w-8 h-8 rounded bg-brand-500/10 flex items-center justify-center text-brand-400">
+                      <i class="fas fa-envelope"></i>
+                    </div>
+                    <div class="overflow-hidden">
+                      <p class="text-sm font-medium text-white truncate">${t.name}</p>
+                      <p class="text-[11px] text-surface-500 truncate">${t.subject}</p>
+                    </div>
+                  </div>
+                  <div class="flex gap-2 shrink-0">
+                    <button class="btn-ghost btn-sm text-xs" onclick="showEditEmailTemplateModal('${t.id || t._id}')"><i class="fas fa-edit"></i></button>
+                    <button class="btn-ghost btn-sm text-xs text-rose-400" onclick="deleteEmailTemplate('${t.id || t._id}')"><i class="fas fa-trash"></i></button>
+                  </div>
+                </div>
+              `).join('')}
+              ${EMAIL_TEMPLATES.length === 0 ? '<div class="text-center py-8 text-surface-500 text-sm">No email templates created yet</div>' : ''}
+            </div>
+          </div>
+        ` : ''}
       </div>
     </div>
   `;
@@ -3216,6 +3334,16 @@ async function saveDistributionSettings() {
     btn.innerHTML = originalHTML;
   }
 }
+
+// ========== EMAIL HISTORY ==========
+let emailHistoryFilter = {
+  search: '',
+  agentId: 'all',
+  teamId: 'all',
+  dateRange: '30',
+  startDate: '',
+  endDate: ''
+};
 
 // ========== WORK HISTORY ==========
 let workHistoryFilter = {
@@ -3304,6 +3432,152 @@ function getOutcomeBadgeClass(outcome) {
     default:
       return 'badge-new';
   }
+}
+
+function getFilteredEmails() {
+  let list = [...emailLogs];
+
+  if (APP.currentRole === 'tl') {
+    const tl = getUser(APP.currentUserId);
+    if (tl) {
+      const tlTeamId = tl.team_id && typeof tl.team_id === 'object' ? (tl.team_id._id || tl.team_id.id) : tl.team_id;
+      list = list.filter(c => {
+        const agent = getUser(c.agent_id);
+        if (!agent) return false;
+        const agentTeamId = agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : agent.team_id;
+        return agentTeamId === tlTeamId || agent.id === tl.id;
+      });
+    } else {
+      list = [];
+    }
+  } else if (APP.currentRole === 'agent') {
+    list = list.filter(c => c.agent_id === APP.currentUserId);
+  }
+
+  if (emailHistoryFilter.teamId !== 'all') {
+    list = list.filter(c => {
+      const agent = getUser(c.agent_id);
+      if (!agent) return false;
+      const agentTeamId = agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : agent.team_id;
+      return agentTeamId === emailHistoryFilter.teamId;
+    });
+  }
+
+  if (emailHistoryFilter.agentId !== 'all') {
+    list = list.filter(c => c.agent_id === emailHistoryFilter.agentId);
+  }
+
+  const now = new Date();
+  if (emailHistoryFilter.dateRange === 'all') {
+    // No filtering
+  } else if (emailHistoryFilter.dateRange === 'custom') {
+    if (emailHistoryFilter.startDate) {
+      const start = new Date(emailHistoryFilter.startDate);
+      start.setHours(0, 0, 0, 0);
+      list = list.filter(c => new Date(c.created_at) >= start);
+    }
+    if (emailHistoryFilter.endDate) {
+      const end = new Date(emailHistoryFilter.endDate);
+      end.setHours(23, 59, 59, 999);
+      list = list.filter(c => new Date(c.created_at) <= end);
+    }
+  } else {
+    const filterDate = new Date();
+    filterDate.setDate(now.getDate() - parseInt(emailHistoryFilter.dateRange));
+    filterDate.setHours(0, 0, 0, 0);
+    list = list.filter(c => new Date(c.created_at) >= filterDate);
+  }
+
+  if (emailHistoryFilter.search) {
+    const s = emailHistoryFilter.search.toLowerCase();
+    list = list.filter(c => {
+      const lead = leads.find(l => l.id === c.lead_id || l._id === c.lead_id);
+      const agent = getUser(c.agent_id);
+      return (
+        (lead && lead.name && lead.name.toLowerCase().includes(s)) ||
+        (lead && lead.phone && lead.phone.includes(s)) ||
+        (lead && lead.email && lead.email.toLowerCase().includes(s)) ||
+        (agent && agent.name && agent.name.toLowerCase().includes(s)) ||
+        (c.subject && c.subject.toLowerCase().includes(s)) ||
+        (c.to && c.to.toLowerCase().includes(s))
+      );
+    });
+  }
+
+  return list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+function handleEmailHistorySearch(val) {
+  emailHistoryFilter.search = val;
+  renderPage();
+}
+
+function exportEmailHistoryToCSV() {
+  const list = getFilteredEmails();
+  if (list.length === 0) {
+    toast('No data to export', 'warning');
+    return;
+  }
+
+  const headers = ['Date & Time', 'Agent', 'Team', 'Lead Name', 'Lead Number', 'To', 'Subject', 'Body Text'];
+
+  const rows = list.map(c => {
+    const lead = leads.find(l => l.id === c.lead_id || l._id === c.lead_id);
+    const agent = getUser(c.agent_id);
+    const teamId = agent ? (agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : agent.team_id) : null;
+    const team = getTeam(teamId);
+
+    const formattedTime = new Date(c.created_at).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    const agentName = agent ? agent.name : 'Unknown Agent';
+    const teamName = team ? team.name : '—';
+    const leadName = lead ? lead.name : 'Unknown Lead';
+    const leadPhone = lead ? lead.phone : '—';
+    const toVal = c.to || '—';
+    const subjectVal = c.subject || '—';
+    const bodyVal = c.body || '—';
+
+    return [formattedTime, agentName, teamName, leadName, leadPhone, toVal, subjectVal, bodyVal];
+  });
+
+  const escapeCSV = (val) => {
+    if (val === null || val === undefined) return '';
+    let str = String(val);
+    // Strip HTML from body for CSV
+    str = str.replace(/<[^>]*>?/gm, '');
+    str = str.replace(/"/g, '""');
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+      str = `"${str}"`;
+    }
+    return str;
+  };
+
+  const csvContent = [
+    headers.map(escapeCSV).join(','),
+    ...rows.map(row => row.map(escapeCSV).join(','))
+  ].join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  
+  const today = new Date();
+  const dateStr = today.toISOString().split('T')[0];
+  link.setAttribute('download', `email_history_${dateStr}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  toast('Email history exported to CSV successfully');
 }
 
 function getFilteredCalls() {
@@ -3934,6 +4208,131 @@ function renderReports() {
   `;
 }
 
+function setFootprintTab(tab) {
+  APP.currentFootprintTab = tab;
+  renderPage();
+}
+
+function renderFootprints() {
+  if (APP.currentFootprintTab === 'workHistory') {
+    return renderWorkHistory();
+  } else {
+    return renderEmailHistory();
+  }
+}
+
+function renderEmailHistory() {
+  const list = getFilteredEmails();
+  const isCustom = emailHistoryFilter.dateRange === 'custom';
+  
+  const agents = APP.currentRole === 'admin' 
+    ? USERS.filter(u => u.role === 'agent' && u.active) 
+    : APP.currentRole === 'tl' 
+      ? USERS.filter(u => u.role === 'agent' && u.active && (u.team_id === getUser(APP.currentUserId)?.team_id || (typeof u.team_id === 'object' && (u.team_id._id || u.team_id.id) === (getUser(APP.currentUserId)?.team_id?._id || getUser(APP.currentUserId)?.team_id))))
+      : [];
+      
+  const teams = TEAMS;
+
+  return `
+    <div class="fade-in">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="font-display font-bold text-2xl text-white">Footprints</h2>
+          <div class="flex items-center gap-4 mt-2">
+            <div class="flex items-center gap-1 bg-surface-800 p-1 rounded-lg">
+              <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${APP.currentFootprintTab === 'workHistory' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:text-white'}" onclick="setFootprintTab('workHistory')">Work History</button>
+              <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${APP.currentFootprintTab === 'emailHistory' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:text-white'}" onclick="setFootprintTab('emailHistory')">Email History</button>
+            </div>
+            <span class="text-surface-400 text-sm hidden sm:inline-block">|</span>
+            <p class="text-surface-400 text-sm">${list.length} emails recorded</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-primary text-sm flex items-center gap-2" onclick="exportEmailHistoryToCSV()">
+            <i class="fas fa-file-export"></i> Export CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="card mb-4">
+        <div class="flex flex-wrap gap-3">
+          <input type="text" class="form-input py-2 text-sm w-64" placeholder="Search lead, agent, subject..." value="${emailHistoryFilter.search}" oninput="handleEmailHistorySearch(this.value)">
+          
+          ${APP.currentRole === 'admin' ? `
+            <select class="form-input py-2 text-sm w-48" onchange="emailHistoryFilter.teamId=this.value; renderPage()">
+              <option value="all" ${emailHistoryFilter.teamId === 'all' ? 'selected' : ''}>All Teams</option>
+              ${teams.map(t => `<option value="${t.id || t._id}" ${emailHistoryFilter.teamId === (t.id || t._id) ? 'selected' : ''}>${t.name}</option>`).join('')}
+            </select>
+          ` : ''}
+          
+          ${(APP.currentRole === 'admin' || APP.currentRole === 'tl') ? `
+            <select class="form-input py-2 text-sm w-48" onchange="emailHistoryFilter.agentId=this.value; renderPage()">
+              <option value="all" ${emailHistoryFilter.agentId === 'all' ? 'selected' : ''}>All Agents</option>
+              ${agents.map(a => `<option value="${a.id || a._id}" ${emailHistoryFilter.agentId === (a.id || a._id) ? 'selected' : ''}>${a.name}</option>`).join('')}
+            </select>
+          ` : ''}
+
+          <select class="form-input py-2 text-sm w-48" onchange="emailHistoryFilter.dateRange=this.value; renderPage()">
+            <option value="7" ${emailHistoryFilter.dateRange === '7' ? 'selected' : ''}>Last 7 Days</option>
+            <option value="30" ${emailHistoryFilter.dateRange === '30' ? 'selected' : ''}>Last 30 Days</option>
+            <option value="90" ${emailHistoryFilter.dateRange === '90' ? 'selected' : ''}>Last 90 Days</option>
+            <option value="custom" ${emailHistoryFilter.dateRange === 'custom' ? 'selected' : ''}>Custom Range</option>
+            <option value="all" ${emailHistoryFilter.dateRange === 'all' ? 'selected' : ''}>All Time</option>
+          </select>
+
+          ${isCustom ? `
+            <div class="flex items-center gap-2">
+              <input type="date" class="form-input py-2 text-xs w-auto" value="${emailHistoryFilter.startDate}" onchange="emailHistoryFilter.startDate=this.value; renderPage()">
+              <span class="text-surface-500">to</span>
+              <input type="date" class="form-input py-2 text-xs w-auto" value="${emailHistoryFilter.endDate}" onchange="emailHistoryFilter.endDate=this.value; renderPage()">
+            </div>
+          ` : ''}
+
+          <button class="btn btn-ghost btn-sm" onclick="emailHistoryFilter={search:'',agentId:'all',teamId:'all',dateRange:'30',startDate:'',endDate:''};renderPage()"><i class="fas fa-times"></i> Clear</button>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden">
+        <table class="w-full">
+          <thead>
+            <tr class="border-b border-surface-800 text-left text-xs uppercase text-surface-400">
+              <th class="px-4 py-3">Date & Time</th>
+              <th class="px-4 py-3">Agent</th>
+              <th class="px-4 py-3">Team</th>
+              <th class="px-4 py-3">Lead Name</th>
+              <th class="px-4 py-3">Lead Number</th>
+              <th class="px-4 py-3">To</th>
+              <th class="px-4 py-3">Subject</th>
+              <th class="px-4 py-3">Body Text</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-surface-800">
+            ${list.map(e => {
+              const agent = USERS.find(u => u.id === e.agent_id || u._id === e.agent_id);
+              const team = agent ? TEAMS.find(t => t.id === agent.team_id || t._id === agent.team_id) : null;
+              const lead = leads.find(l => l.id === e.lead_id || l._id === e.lead_id);
+              return `
+              <tr class="text-sm text-surface-300 hover:bg-surface-800/30 transition-colors">
+                <td class="px-4 py-3">${new Date(e.created_at).toLocaleString()}</td>
+                <td class="px-4 py-3">${agent?.name || 'Unknown'}</td>
+                <td class="px-4 py-3">${team?.name || '—'}</td>
+                <td class="px-4 py-3">${lead?.name || 'Unknown'}</td>
+                <td class="px-4 py-3">${lead?.phone || '—'}</td>
+                <td class="px-4 py-3">${e.to}</td>
+                <td class="px-4 py-3 font-medium text-white">${e.subject}</td>
+                <td class="px-4 py-3 max-w-xs truncate" title="${e.body.replace(/"/g, '&quot;')}">${e.body}</td>
+              </tr>
+            `;
+            }).join('')}
+            ${list.length === 0 ? '<tr><td colspan="8" class="px-4 py-8 text-center text-surface-500">No emails found</td></tr>' : ''}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 function renderWorkHistory() {
   const list = getFilteredCalls();
   const isCustom = workHistoryFilter.dateRange === 'custom';
@@ -3949,8 +4348,15 @@ function renderWorkHistory() {
     <div class="fade-in">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 class="font-display font-bold text-2xl text-white">Work History</h2>
-          <p id="workHistoryCount" class="text-surface-400 text-sm mt-1">${list.length} calls recorded</p>
+          <h2 class="font-display font-bold text-2xl text-white">Footprints</h2>
+          <div class="flex items-center gap-4 mt-2">
+            <div class="flex items-center gap-1 bg-surface-800 p-1 rounded-lg">
+              <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${APP.currentFootprintTab === 'workHistory' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:text-white'}" onclick="setFootprintTab('workHistory')">Work History</button>
+              <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${APP.currentFootprintTab === 'emailHistory' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:text-white'}" onclick="setFootprintTab('emailHistory')">Email History</button>
+            </div>
+            <span class="text-surface-400 text-sm hidden sm:inline-block">|</span>
+            <p id="workHistoryCount" class="text-surface-400 text-sm">${list.length} calls recorded</p>
+          </div>
         </div>
         <div class="flex items-center gap-2">
           <button class="btn btn-secondary text-sm flex items-center gap-2" onclick="showColumnSelector = !showColumnSelector; renderPage()">
@@ -4624,6 +5030,182 @@ async function deleteLeadPriority(key) {
   });
 }
 
+// --- Email Template Modals and Actions ---
+function showAddEmailTemplateModal() {
+  document.getElementById('emailTemplateEditId').value = '';
+  document.getElementById('emailTemplateForm').reset();
+  document.getElementById('emailTemplateModalTitle').textContent = 'Add Email Template';
+  document.getElementById('emailTemplateSubmitBtn').textContent = 'Save Template';
+  openModal('emailTemplateModal');
+}
+
+function showEditEmailTemplateModal(id) {
+  const template = EMAIL_TEMPLATES.find(t => t.id === id);
+  if (!template) return;
+  document.getElementById('emailTemplateEditId').value = id;
+  document.getElementById('et_name').value = template.name;
+  document.getElementById('et_subject').value = template.subject;
+  document.getElementById('et_body').value = template.body;
+  document.getElementById('emailTemplateModalTitle').textContent = 'Edit Email Template';
+  document.getElementById('emailTemplateSubmitBtn').textContent = 'Save Changes';
+  openModal('emailTemplateModal');
+}
+
+async function handleEmailTemplateSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('emailTemplateEditId').value;
+  const data = {
+    name: document.getElementById('et_name').value.trim(),
+    subject: document.getElementById('et_subject').value.trim(),
+    body: document.getElementById('et_body').value.trim()
+  };
+
+  const btn = document.getElementById('emailTemplateSubmitBtn');
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  try {
+    if (id) {
+      const updated = await fetchAPI(`/email-templates/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+      const idx = EMAIL_TEMPLATES.findIndex(t => t.id === id);
+      if (idx > -1) EMAIL_TEMPLATES[idx] = { ...updated, id: updated._id };
+      toast('Template updated');
+    } else {
+      const created = await fetchAPI('/email-templates', { method: 'POST', body: JSON.stringify(data) });
+      EMAIL_TEMPLATES.push({ ...created, id: created._id });
+      toast('Template created');
+    }
+    closeModal('emailTemplateModal');
+    renderPage();
+  } catch (err) {
+    // Handled
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
+async function deleteEmailTemplate(id) {
+  showConfirmModal('Delete Template', 'Are you sure you want to delete this email template?', async () => {
+    try {
+      await fetchAPI(`/email-templates/${id}`, { method: 'DELETE' });
+      EMAIL_TEMPLATES = EMAIL_TEMPLATES.filter(t => t.id !== id);
+      toast('Template deleted');
+      renderPage();
+    } catch (err) {
+      // Handled
+    }
+  });
+}
+
+function insertPlaceholder(placeholder, textareaId) {
+  const textarea = document.getElementById(textareaId);
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+  textarea.value = text.substring(0, start) + placeholder + text.substring(end);
+  textarea.focus();
+  textarea.setSelectionRange(start + placeholder.length, start + placeholder.length);
+}
+
+// --- Send Email Actions ---
+function showSendEmailModal(leadId) {
+  const lead = leads.find(l => (l.id || l._id) === leadId);
+  if (!lead) return;
+  
+  document.getElementById('se_leadId').value = leadId;
+  document.getElementById('se_to').value = lead.email || '';
+  document.getElementById('se_subject').value = '';
+  document.getElementById('se_body').value = '';
+  document.getElementById('se_wordCount').textContent = 'Words: 0';
+  
+  const select = document.getElementById('se_templateSelect');
+  select.innerHTML = '<option value="">Draft New (Manual)</option>';
+  EMAIL_TEMPLATES.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    select.appendChild(opt);
+  });
+  
+  openModal('sendEmailModal');
+}
+
+function applyEmailTemplate(templateId) {
+  if (!templateId) {
+    document.getElementById('se_subject').value = '';
+    document.getElementById('se_body').value = '';
+    updateWordCount();
+    return;
+  }
+  
+  const template = EMAIL_TEMPLATES.find(t => t.id === templateId);
+  const leadId = document.getElementById('se_leadId').value;
+  const lead = leads.find(l => (l.id || l._id) === leadId);
+  
+  if (!template || !lead) return;
+  
+  let subject = template.subject;
+  let body = template.body;
+  
+  // Replace placeholders
+  const placeholders = {
+    '{{name}}': lead.name || '',
+    '{{loan_type}}': LOAN_LABELS[lead.loan_type] || lead.loan_type || '',
+    '{{amount}}': formatCurrency(lead.amount_requested || 0),
+    '{{status}}': STATUS_LABELS[lead.status] || lead.status || '',
+    '{{phone}}': lead.phone || '',
+    '{{email}}': lead.email || lead.Email || '',
+    '{{agent_name}}': getUser(lead.assigned_to)?.name || 'Agent'
+  };
+  
+  for (const [key, val] of Object.entries(placeholders)) {
+    subject = subject.replace(new RegExp(key, 'g'), val);
+    body = body.replace(new RegExp(key, 'g'), val);
+  }
+  
+  document.getElementById('se_subject').value = subject;
+  document.getElementById('se_body').value = body;
+  updateWordCount();
+}
+
+async function handleSendEmailSubmit(e) {
+  e.preventDefault();
+  const leadId = document.getElementById('se_leadId').value;
+  const to = document.getElementById('se_to').value.trim();
+  const subject = document.getElementById('se_subject').value.trim();
+  const html = document.getElementById('se_body').value.trim();
+  
+  if (!to) {
+    toast('Recipient email is missing', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('sendEmailSubmitBtn');
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+  
+  try {
+    const res = await fetchAPI('/send-email', {
+      method: 'POST',
+      body: JSON.stringify({ to, subject, html, leadId })
+    });
+    if (res.log) {
+      emailLogs.unshift(res.log);
+    }
+    toast('Email sent successfully!');
+    closeModal('sendEmailModal');
+    renderPage();
+  } catch (err) {
+    // Handled
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+  }
+}
+
 async function handleCompanyProfileSubmit(e) {
   e.preventDefault();
   const btn = document.getElementById('saveCompanyProfileBtn');
@@ -4662,21 +5244,33 @@ async function handleCompanyProfileSubmit(e) {
 function showAddSourceModal() {
   document.getElementById('sourceEditKey').value = '';
   document.getElementById('sourceForm').reset();
+  document.getElementById('sourceKey').disabled = false;
   document.getElementById('sourceModalTitle').textContent = 'Add Lead Source';
   document.getElementById('sourceSubmitBtn').textContent = 'Add Source';
   openModal('addSourceModal');
 }
 
+function openEditSourceModal(key) {
+  document.getElementById('sourceEditKey').value = key;
+  document.getElementById('sourceKey').value = key;
+  document.getElementById('sourceKey').disabled = true;
+  document.getElementById('sourceDisplayName').value = SOURCE_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1);
+  document.getElementById('sourceModalTitle').textContent = 'Edit Lead Source';
+  document.getElementById('sourceSubmitBtn').textContent = 'Update Source';
+  openModal('addSourceModal');
+}
+
 async function handleSourceSubmit(e) {
   e.preventDefault();
+  const editKey = document.getElementById('sourceEditKey').value;
   const key = document.getElementById('sourceKey').value.trim().toLowerCase().replace(/\s+/g, '_');
+  const displayName = document.getElementById('sourceDisplayName').value.trim();
 
-  if (!key) {
-    toast('Invalid source key', 'error');
+  if (!key || !displayName) {
+    toast('Invalid source key or display name', 'error');
     return;
   }
-
-  if (SOURCES.includes(key)) {
+  if (!editKey && SOURCES.includes(key)) {
     toast('Lead source already exists', 'error');
     return;
   }
@@ -4685,15 +5279,19 @@ async function handleSourceSubmit(e) {
   const originalHTML = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-
   try {
-    SOURCES.push(key);
+    if (!editKey) {
+        SOURCES.push(key);
+    }
+    SOURCE_LABELS[key] = displayName;
     await fetchAPI('/settings/sources', { method: 'POST', body: JSON.stringify({ value: SOURCES }) });
-    toast('Lead Source added successfully');
+    await fetchAPI('/settings/source_labels', { method: 'POST', body: JSON.stringify({ value: SOURCE_LABELS }) });
+    toast(editKey ? 'Lead Source updated successfully' : 'Lead Source added successfully');
     closeModal('addSourceModal');
     renderPage();
   } catch (err) {
-    SOURCES.pop();
+    console.error('Error saving source:', err);
+    toast('Failed to save source', 'error');
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalHTML;
@@ -4717,7 +5315,9 @@ async function deleteSource(key) {
       const index = SOURCES.indexOf(key);
       if (index > -1) {
         SOURCES.splice(index, 1);
+        delete SOURCE_LABELS[key];
         await fetchAPI('/settings/sources', { method: 'POST', body: JSON.stringify({ value: SOURCES }) });
+        await fetchAPI('/settings/source_labels', { method: 'POST', body: JSON.stringify({ value: SOURCE_LABELS }) });
         toast('Lead Source deleted successfully');
         renderPage();
       }
@@ -5121,7 +5721,7 @@ async function showLeadDetail(id) {
   const lead = leads.find(l => l.id === id || l._id === id);
   if (!lead) return;
   
-  // Show modal with loading state for calls
+  // Show modal with loading state
   document.getElementById('leadDetailContent').innerHTML = `
     <div class="p-12 text-center">
       <i class="fas fa-spinner fa-spin text-4xl text-brand-500 mb-4"></i>
@@ -5131,7 +5731,11 @@ async function showLeadDetail(id) {
   openModal('leadDetailModal');
 
   try {
-    const calls = await fetchAPI(`/calls/${lead.id || lead._id}`);
+    const [calls, emails] = await Promise.all([
+      fetchAPI(`/calls/${lead.id || lead._id}`),
+      fetchAPI(`/email-logs/${lead.id || lead._id}`).catch(() => [])
+    ]);
+    
     const agent = getUser(lead.assigned_agent_id);
     const canManage = APP.currentRole !== 'agent';
 
@@ -5180,29 +5784,51 @@ async function showLeadDetail(id) {
           </div>
         ` : ''}
 
-        <!-- Call history -->
-        <div>
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="font-display font-semibold text-white">Call History (${calls ? calls.length : 0})</h4>
-            <button class="btn btn-primary btn-sm" onclick="closeModal('leadDetailModal');showCallLogModal('${lead.id || lead._id}')"><i class="fas fa-phone-alt"></i> Log Call</button>
-          </div>
-          ${!calls || calls.length === 0 ? '<p class="text-surface-500 text-sm py-4 text-center">No calls logged yet</p>' : `
-            <div class="space-y-3 max-h-64 overflow-y-auto">
-              ${calls.map(c => `
-                <div class="bg-surface-800/50 rounded-lg p-3">
-                  <div class="flex items-center justify-between mb-1">
-                    <div class="flex items-center gap-2">
-                      <i class="fas fa-phone-alt text-xs ${c.outcome === 'answered' ? 'text-brand-400' : 'text-surface-500'}"></i>
-                      <span class="text-sm text-white font-medium capitalize">${c.outcome.replace('_',' ')}</span>
-                    </div>
-                    <span class="text-xs text-surface-500">${formatDateTime(c.created_at)}</span>
-                  </div>
-                  ${c.notes ? `<p class="text-sm text-surface-400 mt-1">${c.notes}</p>` : ''}
-                  ${c.follow_up_at ? `<p class="text-xs text-amber-400 mt-1"><i class="fas fa-clock mr-1"></i>Follow-up: ${formatDateTime(c.follow_up_at)}</p>` : ''}
-                </div>
-              `).join('')}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Call history -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="font-display font-semibold text-white text-sm">Call History (${calls ? calls.length : 0})</h4>
+              <button class="btn btn-primary btn-sm px-2 text-xs h-7" onclick="closeModal('leadDetailModal');showCallLogModal('${lead.id || lead._id}')"><i class="fas fa-phone-alt mr-1"></i> Log</button>
             </div>
-          `}
+            ${!calls || calls.length === 0 ? '<p class="text-surface-500 text-[11px] py-4 text-center">No calls logged</p>' : `
+              <div class="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                ${calls.map(c => `
+                  <div class="bg-surface-800/30 rounded-lg p-2.5 border border-surface-700/30">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-xs text-white font-medium capitalize">${c.outcome.replace('_',' ')}</span>
+                      <span class="text-[10px] text-surface-500">${formatDateTime(c.created_at)}</span>
+                    </div>
+                    ${c.notes ? `<p class="text-[11px] text-surface-400 leading-tight">${c.notes}</p>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+
+          <!-- Email history -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="font-display font-semibold text-white text-sm">Email History (${emails ? emails.length : 0})</h4>
+              ${lead.email ? `<button class="btn btn-primary btn-sm px-2 text-xs h-7" onclick="closeModal('leadDetailModal');showSendEmailModal('${lead.id || lead._id}')"><i class="fas fa-paper-plane mr-1"></i> Send</button>` : ''}
+            </div>
+            ${!emails || emails.length === 0 ? '<p class="text-surface-500 text-[11px] py-4 text-center">No emails sent</p>' : `
+              <div class="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                ${emails.map(e => `
+                  <div class="bg-surface-800/30 rounded-lg p-2.5 border border-surface-700/30">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-xs text-white font-medium truncate max-w-[140px]" title="${e.subject}">${e.subject}</span>
+                      <span class="text-[10px] text-surface-500 shrink-0">${formatDateTime(e.created_at)}</span>
+                    </div>
+                    <p class="text-[10px] text-brand-400 truncate">To: ${e.to}</p>
+                    <div class="text-[10px] text-surface-400 mt-1.5 border-t border-surface-700/30 pt-1.5 max-h-64 overflow-y-auto custom-scrollbar">
+                      ${e.body ? e.body.replace(/<[^>]*>/g, ' ').substring(0, 1000) : 'No content'}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
         </div>
 
         ${canManage ? `
@@ -5244,6 +5870,7 @@ async function deleteLead(id) {
     toast('Lead deleted successfully');
     leads = leads.filter(l => l.id !== id && l._id !== id);
     callLogs = callLogs.filter(c => c.lead_id !== id);
+    emailLogs = emailLogs.filter(e => e.lead_id !== id);
     const allocHistoryData = await fetchAPI('/settings/allocation_history').catch(() => []);
     allocationHistory = Array.isArray(allocHistoryData) ? allocHistoryData : [];
     renderPage();
@@ -5429,8 +6056,8 @@ async function performImport(confirm) {
       const modal = document.getElementById('confirmModal');
       modal.querySelector('.p-6').innerHTML = `
         <div class="flex items-center gap-4 mb-4">
-          <div class="w-12 h-12 rounded-full bg-amber-600/20 flex items-center justify-center flex-shrink-0">
-            <i class="fas fa-exclamation-triangle text-xl text-amber-400"></i>
+          <div class="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+            <i class="fas fa-exclamation-triangle text-xl text-orange-500"></i>
           </div>
           <div>
             <h3 class="font-bold text-white text-lg">Duplicates Found</h3>
@@ -5439,7 +6066,7 @@ async function performImport(confirm) {
         </div>
         <div class="flex justify-end gap-3 mt-6">
           <button class="btn-ghost" onclick="closeModal('confirmModal')">Cancel</button>
-          <button class="btn-primary bg-amber-600 hover:bg-amber-700" onclick="performImport(true); closeModal('confirmModal')">Import Only New</button>
+          <button class="btn-primary bg-orange-600 hover:bg-orange-700" onclick="performImport(true); closeModal('confirmModal')">Import Only New</button>
         </div>
       `;
       openModal('confirmModal');
@@ -5468,16 +6095,16 @@ async function performImport(confirm) {
 // ========== EXPORT ==========
 function downloadCSVTemplate() {
   const templateCSV = `Name,Phone,Email,City,Loan Type,Amount,Source,Status
-Aarav Sharma,9876543210,aarav.sharma@email.com,Mumbai,Home Loan,5000000,Facebook,New
-Priya Patel,9123456789,priya.patel@email.com,Delhi,Personal Loan,200000,Website,New
-Rohan Gupta,9988776655,rohan.gupta@email.com,Bangalore,Car Loan,800000,Referral,New
-Sneha Singh,9876501234,sneha.singh@email.com,Hyderabad,Business Loan,1500000,Website,New
-Amit Verma,9112233445,amit.verma@email.com,Chennai,Home Loan,3000000,Google,New
-Megha Reddy,9001122334,megha.reddy@email.com,Pune,Personal Loan,500000,Facebook,New
-Vikram Iyer,9887766554,vikram.iyer@email.com,Kolkata,Education Loan,1000000,Website,New
-Anjali Das,9776655443,anjali.das@email.com,Ahmedabad,Car Loan,700000,Google,New
-Rahul Kumar,9665544332,rahul.kumar@email.com,Jaipur,Personal Loan,300000,Referral,New
-Sonia Rao,9554433221,sonia.rao@email.com,Lucknow,Home Loan,4000000,Facebook,New`;
+Aarav Sharma,9876543210,aarav.sharma@email.com,Mumbai,home_loan,5000000,facebook,new
+Priya Patel,9123456789,priya.patel@email.com,Delhi,personal_loan,200000,website,new
+Rohan Gupta,9988776655,rohan.gupta@email.com,Bangalore,car_loan,800000,referral,new
+Sneha Singh,9876501234,sneha.singh@email.com,Hyderabad,business_loan,1500000,website,new
+Amit Verma,9112233445,amit.verma@email.com,Chennai,home_loan,3000000,google,new
+Megha Reddy,9001122334,megha.reddy@email.com,Pune,personal_loan,500000,facebook,new
+Vikram Iyer,9887766554,vikram.iyer@email.com,Kolkata,education_loan,1000000,website,new
+Anjali Das,9776655443,anjali.das@email.com,Ahmedabad,car_loan,700000,google,new
+Rahul Kumar,9665544332,rahul.kumar@email.com,Jaipur,personal_loan,300000,referral,new
+Sonia Rao,9554433221,sonia.rao@email.com,Lucknow,home_loan,4000000,facebook,new`;
 
   const blob = new Blob([templateCSV], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -5524,6 +6151,12 @@ function exportLeadsCSV(selectedOnly = false) {
 
 // ========== JSON BACKUP & RESTORE ==========
 let restoreData = null;
+
+function updateWordCount() {
+  const body = document.getElementById('se_body').value;
+  const words = body.trim().split(/\s+/).filter(w => w.length > 0).length;
+  document.getElementById('se_wordCount').textContent = `Words: ${words}`;
+}
 
 async function backupDataJSON() {
   const startDate = document.getElementById('backupStartDate').value;
