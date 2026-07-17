@@ -23,6 +23,7 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 };
 
 const leadSchema = new mongoose.Schema({
+  lead_uid: { type: String, unique: true },
   name: { type: String, required: true },
   phone: { type: String, required: true },
   email: { type: String },
@@ -30,6 +31,7 @@ const leadSchema = new mongoose.Schema({
   loan_type: { type: String, required: true },
   amount_requested: { type: Number, required: true },
   source: { type: String, required: true },
+  lead_category: { type: String, default: 'Individual' },
   priority: { type: String, default: 'cold' },
   status: { type: String, default: 'new' },
   assigned_agent_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -69,6 +71,7 @@ const callLogSchema = new mongoose.Schema({
   outcome: { type: String, required: true },
   notes: { type: String },
   follow_up_at: { type: Date },
+  follow_up_status: { type: String, enum: ['pending', 'done'], default: 'pending' },
   created_at: { type: Date, default: Date.now }
 });
 

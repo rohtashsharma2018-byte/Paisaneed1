@@ -6,6 +6,7 @@
 <title>CRM System – Lead & Calling Agent CRM</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script>
@@ -21,11 +22,12 @@ h1,h2,h3,h4,h5,h6{font-family:'Outfit',sans-serif}
 ::-webkit-scrollbar-thumb:hover{background:#57534e}
 
 /* Sidebar */
-.sidebar{width:260px;min-height:100vh;background:#1c1917;border-right:1px solid #292524;position:fixed;left:0;top:0;z-index:40;transition:width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);border-radius:0 24px 24px 0;overflow:hidden}
+.sidebar{width:260px;height:100vh;background:#1c1917;border-right:1px solid #292524;position:fixed;left:0;top:0;z-index:40;transition:width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);border-radius:0 24px 24px 0;overflow:hidden;display:flex;flex-direction:column}
 .sidebar.collapsed{transform:translateX(-260px)}
 .sidebar-link{display:flex;align-items:center;gap:12px;padding:10px 20px;color:#a8a29e;font-size:14px;transition:all .2s;border-radius:8px;margin:2px 12px;cursor:pointer}
 .sidebar-link:hover{color:#e7e5e4;background:#292524}
-.sidebar-link.active{color:#10b981;background:rgba(16,185,129,.1);font-weight:600}
+.sidebar-link.active{color:#ffffff;background:rgba(255,255,255,.08);font-weight:600}
+.sidebar-link.active i{color:#a8a29e}
 .sidebar-link i{width:20px;text-align:center;font-size:15px}
 
 /* Main content */
@@ -97,6 +99,7 @@ h1,h2,h3,h4,h5,h6{font-family:'Outfit',sans-serif}
 .stat-card{position:relative;overflow:hidden}
 .stat-card::after{content:'';position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;opacity:.08}
 .stat-card.emerald::after{background:#10b981}
+.stat-card.google-yellow::after{background:#F4B400}
 .stat-card.amber::after{background:#f59e0b}
 .stat-card.sky::after{background:#0ea5e9}
 .stat-card.rose::after{background:#f43f5e}
@@ -139,6 +142,7 @@ h1,h2,h3,h4,h5,h6{font-family:'Outfit',sans-serif}
 /* Form inputs */
 .form-input{width:100%;padding:10px 14px;background:#0f110f;border:1px solid #292524;border-radius:8px;color:#e7e5e4;font-size:14px;font-family:'DM Sans',sans-serif;transition:border-color .2s;outline:none}
 .form-input:focus{border-color:#10b981}
+#loginEmail:focus, #loginPassword:focus{border-color:#4285f4 !important;box-shadow:0 0 0 1px #4285f4 !important}
 .form-input::placeholder{color:#57534e}
 select.form-input{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2378716c' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 select.form-input option{background:#1c1917;color:#e7e5e4}
@@ -220,9 +224,14 @@ body.light-theme .font-bold.text-white,
 body.light-theme h1, body.light-theme h2, body.light-theme h3 {
   color: #1c1917 !important;
 }
-body.light-theme .sidebar-link.active span,
+body.light-theme .sidebar-link.active {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+body.light-theme .sidebar-link.active span {
+  color: #1c1917 !important;
+}
 body.light-theme .sidebar-link.active i {
-  color: #10b981 !important;
+  color: #78716c !important;
 }
 /* Icons on brand background should stay white */
 body.light-theme .bg-brand-600 i,
@@ -287,12 +296,16 @@ body.light-theme #loginOverlay > div {
 <div id="loginOverlay" class="fixed inset-0 z-[100] bg-[#0f110f] flex items-center justify-center p-4 overflow-y-auto">
   <div class="w-full max-w-md p-8 bg-surface-900 border border-surface-800 rounded-2xl shadow-2xl">
     <div class="text-center mb-8">
-      <div class="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+      <div class="w-16 h-16 bg-surface-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
         <i class="fas fa-users text-2xl text-white"></i>
       </div>
       <h1 class="font-display font-bold text-2xl text-white">CRM System</h1>
     </div>
     <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+      <div id="loginError" class="hidden p-3 text-sm font-semibold text-rose-400 bg-rose-950/25 border border-rose-800/40 rounded-lg flex items-center gap-2">
+        <i class="fas fa-exclamation-circle shrink-0"></i>
+        <span>Invalid credentials</span>
+      </div>
       <div>
         <label class="block text-sm font-medium text-surface-400 mb-1.5">Email Address</label>
         <input type="email" id="loginEmail" class="form-input" required>
@@ -306,7 +319,7 @@ body.light-theme #loginOverlay > div {
           </button>
         </div>
       </div>
-      <button type="submit" class="btn btn-primary w-full py-3 mt-4" id="loginSubmitBtn">
+      <button type="submit" class="btn bg-[#4285f4] hover:bg-[#357ae8] text-white hover:translate-y-[-1px] transition-all duration-200 w-full py-3 mt-4 shadow-sm font-semibold" id="loginSubmitBtn">
         <i class="fas fa-sign-in-alt"></i> Sign In
       </button>
     </form>
@@ -318,7 +331,7 @@ body.light-theme #loginOverlay > div {
 <aside class="sidebar" id="sidebar">
   <div class="p-5 border-b border-surface-800 logo-container">
     <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center shrink-0">
+      <div class="w-9 h-9 rounded-lg bg-surface-800 flex items-center justify-center shrink-0">
         <i class="fas fa-users text-white text-sm"></i>
       </div>
       <div class="logo-text">
@@ -328,50 +341,52 @@ body.light-theme #loginOverlay > div {
     </div>
   </div>
 
-  <div class="p-3">
+  <div class="p-3 flex-1 overflow-y-auto pb-24">
     <p class="text-[10px] font-semibold text-surface-500 uppercase tracking-widest px-3 mb-2 mt-2 sidebar-section-header">Main</p>
-    <div class="sidebar-link active" data-page="dashboard" onclick="navigateTo('dashboard')">
+    <div class="sidebar-link active" data-page="dashboard" onclick="navigateTo('dashboard')" title="Dashboard">
       <i class="fas fa-chart-pie"></i><span>Dashboard</span>
     </div>
-    <div class="sidebar-link" data-page="leads" onclick="navigateTo('leads')">
+    <div class="sidebar-link" data-page="leads" onclick="navigateTo('leads')" title="Leads">
       <i class="fas fa-users"></i><span>Leads</span>
     </div>
-    <div class="sidebar-link" data-page="pipeline" onclick="navigateTo('pipeline')">
+    <div class="sidebar-link" data-page="pipeline" onclick="navigateTo('pipeline')" title="Pipeline">
       <i class="fas fa-columns"></i><span>Pipeline</span>
     </div>
-    <div class="sidebar-link" data-page="calling" onclick="navigateTo('calling')">
+    <div class="sidebar-link" data-page="calling" onclick="navigateTo('calling')" title="Calling Queue">
       <i class="fas fa-phone-alt"></i><span>Calling Queue</span>
-      <span class="ml-auto bg-brand-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full" id="callingCount">0</span>
     </div>
-    <div class="sidebar-link" data-page="footprints" onclick="navigateTo('footprints')">
+    <div class="sidebar-link" data-page="followups" onclick="navigateTo('followups')" title="Follow Ups">
+      <i class="fas fa-calendar-alt"></i><span>Follow Ups</span>
+    </div>
+    <div class="sidebar-link" data-page="footprints" onclick="navigateTo('footprints')" title="Footprints">
       <i class="fas fa-shoe-prints"></i><span>Footprints</span>
     </div>
-    <div class="sidebar-link" data-page="reports" onclick="navigateTo('reports')">
+    <div class="sidebar-link" data-page="reports" onclick="navigateTo('reports')" title="Reports">
       <i class="fas fa-chart-line"></i><span>Reports</span>
     </div>
 
     <p class="text-[10px] font-semibold text-surface-500 uppercase tracking-widest px-3 mb-2 mt-5 sidebar-section-header" id="manageLabel" style="display:none">Management</p>
-    <div class="sidebar-link" data-page="team" onclick="navigateTo('team')" id="navTeam" style="display:none">
+    <div class="sidebar-link" data-page="team" onclick="navigateTo('team')" id="navTeam" style="display:none" title="Team">
       <i class="fas fa-user-friends"></i><span>Team</span>
     </div>
-    <div class="sidebar-link" data-page="allocations" onclick="navigateTo('allocations')" id="navAllocations" style="display:none">
+    <div class="sidebar-link" data-page="allocations" onclick="navigateTo('allocations')" id="navAllocations" style="display:none" title="Allocations">
       <i class="fas fa-exchange-alt"></i><span>Allocations</span>
     </div>
 
-    <div class="sidebar-link" data-page="settings" onclick="navigateTo('settings')" id="navSettings" style="display:none">
+    <div class="sidebar-link" data-page="settings" onclick="navigateTo('settings')" id="navSettings" style="display:none" title="Settings">
       <i class="fas fa-cog"></i><span>Settings</span>
     </div>
   </div>
 
   <!-- User card at bottom -->
-  <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-surface-800 user-card-container">
+  <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-surface-800 bg-[#1c1917] user-card-container">
     <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-full bg-surface-800 flex items-center justify-center text-sm font-bold text-brand-400 shrink-0" id="userAvatar">A</div>
+      <div class="w-9 h-9 rounded-full bg-surface-800 flex items-center justify-center text-sm font-bold text-white shrink-0" id="userAvatar">A</div>
       <div class="flex-1 min-w-0 user-card-info">
         <p class="text-sm font-semibold text-white truncate" id="userName">Admin User</p>
         <p class="text-[11px] text-surface-400 capitalize" id="userRole">Admin</p>
       </div>
-      <button class="btn-ghost rounded-lg text-sm text-brand-400 hover:text-brand-300 mr-1 user-card-action" onclick="showChangePasswordModal()" title="Change Password">
+      <button class="btn-ghost rounded-lg text-sm text-[#fbbc05] hover:text-[#eaaf04] mr-1 user-card-action" onclick="showChangePasswordModal()" title="Change Password">
         <i class="fas fa-key"></i>
       </button>
       <button class="btn-ghost rounded-lg text-sm text-rose-400 hover:text-rose-300 user-card-action" onclick="handleLogout()" title="Logout">
@@ -403,7 +418,7 @@ body.light-theme #loginOverlay > div {
           <i class="fas fa-bell text-lg"></i>
           <span class="notif-dot" id="notifDot"></span>
         </button>
-        <button class="btn btn-primary btn-sm rounded-full" onclick="showAddLeadModal()" id="addLeadBtn">
+        <button class="btn bg-[#fbbc05] hover:bg-[#eaaf04] text-zinc-950 font-semibold hover:translate-y-[-1px] btn-sm rounded-full transition-all duration-200 shadow-sm" onclick="showAddLeadModal()" id="addLeadBtn">
           <i class="fas fa-plus"></i><span class="hidden sm:inline">Add Lead</span>
         </button>
       </div>
@@ -452,12 +467,20 @@ body.light-theme #loginOverlay > div {
         </div>
         <div>
           <label class="block text-sm font-medium text-surface-400 mb-1.5">City</label>
-          <input type="text" class="form-input" id="leadCity" placeholder="Mumbai">
+          <select class="form-input" id="leadCity">
+            <option value="">Select City...</option>
+          </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-surface-400 mb-1.5">Loan Type *</label>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">Category *</label>
+          <select class="form-input" id="leadCategory" required>
+            <!-- Dynamic options -->
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">Product Type *</label>
           <select class="form-input" id="leadLoanType" required>
-            <option value="">Select loan type</option>
+            <option value="">Select product type</option>
             <option value="personal">Personal Loan</option>
             <option value="home">Home Loan</option>
             <option value="business">Business Loan</option>
@@ -591,26 +614,26 @@ body.light-theme #loginOverlay > div {
   </div>
 </div>
 
-<!-- Add Loan Type Modal -->
+<!-- Add Product Type Modal -->
 <div class="modal-overlay" id="addLoanTypeModal">
   <div class="modal" style="max-width:400px">
     <div class="p-6 border-b border-surface-800 flex items-center justify-between">
-      <h3 class="font-display font-bold text-lg text-white" id="loanTypeModalTitle">Add Loan Type</h3>
+      <h3 class="font-display font-bold text-lg text-white" id="loanTypeModalTitle">Add Product Type</h3>
       <button class="btn-ghost rounded-lg" onclick="closeModal('addLoanTypeModal')"><i class="fas fa-times"></i></button>
     </div>
     <form id="loanTypeForm" class="p-6 space-y-4" onsubmit="handleLoanTypeSubmit(event)">
       <input type="hidden" id="loanTypeEditKey">
       <div>
-        <label class="block text-sm font-medium text-surface-400 mb-1.5">Loan Type Code/Key (lowercase, no spaces) *</label>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Product Type Code/Key (lowercase, no spaces) *</label>
         <input type="text" class="form-input" id="loanTypeKey" required placeholder="gold_loan">
       </div>
       <div>
-        <label class="block text-sm font-medium text-surface-400 mb-1.5">Loan Type Display Name *</label>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Product Type Display Name *</label>
         <input type="text" class="form-input" id="loanTypeName" required placeholder="Gold Loan">
       </div>
       <div class="flex justify-end gap-3 pt-2">
         <button type="button" class="btn btn-secondary" onclick="closeModal('addLoanTypeModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary" id="loanTypeSubmitBtn">Add Loan Type</button>
+        <button type="submit" class="btn btn-primary" id="loanTypeSubmitBtn">Add Product Type</button>
       </div>
     </form>
   </div>
@@ -661,6 +684,57 @@ body.light-theme #loginOverlay > div {
       <div class="flex justify-end gap-3 pt-2">
         <button type="button" class="btn btn-secondary" onclick="closeModal('addLeadStatusModal')">Cancel</button>
         <button type="submit" class="btn btn-primary" id="leadStatusSubmitBtn">Add Lead Status</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add/Edit City Modal -->
+<div class="modal-overlay" id="addCityModal">
+  <div class="modal" style="max-width:400px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white" id="cityModalTitle">Add City</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('addCityModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="cityForm" class="p-6 space-y-4" onsubmit="handleCitySubmit(event)">
+      <input type="hidden" id="cityEditKey">
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">City Key *</label>
+        <input type="text" id="cityKey" class="form-input" required placeholder="mumbai" pattern="[a-z0-9_]+" title="Only lowercase letters, numbers, and underscores">
+        <p class="text-xs text-surface-500 mt-1">Used in code (e.g., mumbai). Cannot be changed later.</p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">City Display Name *</label>
+        <input type="text" id="cityName" class="form-input" required placeholder="Mumbai">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addCityModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="citySubmitBtn">Add City</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add/Edit Lead Category Modal -->
+<div class="modal-overlay" id="addLeadCategoryModal">
+  <div class="modal" style="max-width:400px">
+    <div class="p-6 border-b border-surface-800 flex items-center justify-between">
+      <h3 class="font-display font-bold text-lg text-white" id="leadCategoryModalTitle">Add Lead Category</h3>
+      <button class="btn-ghost rounded-lg" onclick="closeModal('addLeadCategoryModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="leadCategoryForm" class="p-6 space-y-4" onsubmit="handleLeadCategorySubmit(event)">
+      <input type="hidden" id="leadCategoryEditKey">
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Category Key (lowercase, no spaces) *</label>
+        <input type="text" class="form-input" id="leadCategoryKey" required placeholder="individual">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-surface-400 mb-1.5">Category Display Name *</label>
+        <input type="text" id="leadCategoryName" class="form-input" required placeholder="Individual">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addLeadCategoryModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="leadCategorySubmitBtn">Add Lead Category</button>
       </div>
     </form>
   </div>
@@ -837,16 +911,19 @@ body.light-theme #loginOverlay > div {
       <button class="btn-ghost rounded-lg" onclick="closeModal('importModal')"><i class="fas fa-times"></i></button>
     </div>
     <div class="p-6">
-      <div id="csvDropZone" class="border-2 border-dashed border-surface-700 rounded-xl p-10 text-center hover:border-brand-500 hover:bg-brand-600/5 transition-all duration-200 cursor-pointer" onclick="document.getElementById('csvInput').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleCSVDrop(event)">
+      <div id="csvDropZone" class="border-2 border-dashed border-surface-700 rounded-xl p-10 text-center hover:border-[#4285F4] hover:bg-[#4285F4]/5 transition-all duration-200 cursor-pointer" onclick="document.getElementById('csvInput').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleCSVDrop(event)">
         <i class="fas fa-cloud-upload-alt text-4xl text-surface-500 mb-3"></i>
         <p class="text-white font-medium">Drop CSV file here or click to browse</p>
-        <p class="text-surface-500 text-sm mt-1">Supports .csv files with columns: name, phone, email, city, loan_type, amount, source, status</p>
+        <p class="text-surface-500 text-sm mt-1">Supports .csv files with columns: name, phone, email, city, category, product_type, amount, source, status</p>
       </div>
       <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSVImport(event)">
       <div id="importPreview" class="mt-4 hidden">
         <div class="flex items-center justify-between mb-2">
           <p class="text-sm text-surface-400"><span id="importCount">0</span> leads found</p>
-          <button class="btn btn-primary btn-sm" onclick="confirmImport()"><i class="fas fa-check"></i> Import All</button>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm" onclick="clearImportSelection()"><i class="fas fa-times"></i> Reselect</button>
+            <button class="btn !bg-[#4285F4] !text-white hover:!bg-[#3367d6] border-none btn-sm shadow-lg shadow-[#4285F4]/20" onclick="confirmImport()"><i class="fas fa-check"></i> Import All</button>
+          </div>
         </div>
         <div class="max-h-48 overflow-y-auto rounded-lg border border-surface-800" id="importTable"></div>
       </div>
@@ -865,6 +942,30 @@ body.light-theme #loginOverlay > div {
     </div>
   </div>
 </div>
+</div>
+
+<!-- Progress Overlay -->
+<div id="progressOverlay" class="fixed inset-0 z-[200] bg-[#0f110f]/80 flex items-center justify-center hidden backdrop-blur-sm transition-opacity duration-300 opacity-0">
+  <div class="flex flex-col items-center bg-surface-900 p-8 rounded-2xl border border-surface-800 shadow-2xl scale-95 transform transition-transform duration-300" id="progressOverlayContent">
+    <div class="relative w-32 h-32 flex items-center justify-center mb-4">
+      <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+        <defs>
+          <mask id="progressMask">
+            <circle cx="50" cy="50" r="45" fill="none" stroke="white" stroke-width="12" stroke-dasharray="282.743" stroke-dashoffset="282.743" id="progressMaskCircle" style="transition: stroke-dashoffset 0.3s ease-out;" />
+          </mask>
+        </defs>
+        <!-- Background dotted track -->
+        <circle cx="50" cy="50" r="45" fill="none" stroke="#292524" stroke-width="8" stroke-dasharray="3 5" />
+        <!-- Foreground dotted track -->
+        <circle cx="50" cy="50" r="45" fill="none" stroke="#4285f4" stroke-width="8" stroke-dasharray="3 5" mask="url(#progressMask)" id="progressForegroundCircle" />
+      </svg>
+      <div class="absolute inset-0 flex flex-col items-center justify-center">
+        <span id="progressPercent" class="text-2xl font-display font-bold text-white">0%</span>
+      </div>
+    </div>
+    <h3 class="text-white font-bold text-lg mb-1" id="progressTitle">Processing</h3>
+    <p id="progressText" class="text-surface-400 font-medium text-sm">Please wait...</p>
+  </div>
 </div>
 
 <!-- Confirm Modal -->
@@ -1008,6 +1109,8 @@ const APP = {
   currentPage: 'dashboard',
   currentFootprintTab: 'workHistory',
   currentPaginationPage: 1,
+  workHistoryPage: 1,
+  emailHistoryPage: 1,
   currentRole: 'admin',
   currentUserId: null,
   userName: '',
@@ -1018,10 +1121,22 @@ const APP = {
   teamViewMode: 'list',
   theme: localStorage.getItem('theme') || 'dark',
   activeSettingsTab: 'general',
-  currentLeadAttachments: []
+  currentLeadAttachments: [],
+  currentFollowUpView: 'table', // calendar, cards, table
+  followUpCalendarView: 'month', // month, week
+  followUpCalendarDate: new Date(),
+  followUpLeadFilter: null,
+  followUpFilters: {
+    search: '',
+    status: 'all',
+    priority: 'all',
+    outcome: 'all',
+    followUpStatus: 'all',
+    timeline: 'all' // all, today, overdue, upcoming
+  }
 };
 
-let leadsFilter = { status: [], loanType: [], source: [], agent: [], aging: [], assignment: 'all', search: '', sort: 'created_at', dir: 'desc' };
+let leadsFilter = { status: [], city: [], loanType: [], source: [], agent: [], aging: [], assignment: 'assigned', search: '', sort: 'created_at', dir: 'desc', followUp: 'all' };
 
 function setTheme(theme) {
   APP.theme = theme;
@@ -1040,6 +1155,8 @@ function setTheme(theme) {
 function changeSettingsTab(tabId) {
   APP.activeSettingsTab = tabId;
   renderPage();
+  const tabButton = document.getElementById(`settings-tab-${tabId}`);
+  if (tabButton) tabButton.focus();
 }
 
 function getChartTheme() {
@@ -1069,6 +1186,87 @@ let PRIORITIES = ['cold', 'warm', 'hot'];
 let PRIORITY_LABELS = { cold: 'Cold', warm: 'Warm', hot: 'Hot' };
 let SOURCES = [];
 let SOURCE_LABELS = {};
+let LEAD_CATEGORIES = ['individual', 'business'];
+let CATEGORY_LABELS = { individual: 'Individual', business: 'Business' };
+let CITIES = [
+  'mumbai', 'delhi', 'bangalore', 'hyderabad', 'chennai', 'pune', 'kolkata', 'ahmedabad', 'jaipur', 'lucknow',
+  'surat', 'kanpur', 'nagpur', 'indore', 'thane', 'bhopal', 'visakhapatnam', 'patna', 'vadodara', 'ghaziabad',
+  'ludhiana', 'agra', 'nashik', 'faridabad', 'meerut', 'rajkot', 'varanasi', 'srinagar', 'aurangabad', 'dhanbad',
+  'amritsar', 'navi_mumbai', 'prayagraj', 'howrah', 'ranchi', 'gwalior', 'jabalpur', 'coimbatore', 'vijayawada',
+  'jodhpur', 'madurai', 'raipur', 'kota', 'guwahati', 'chandigarh', 'solapur', 'hubli_dharwad', 'bareilly',
+  'moradabad', 'mysore', 'gurugram', 'aligarh', 'jalandhar', 'tiruchirappalli', 'bhubaneswar', 'salem', 'warangal',
+  'guntur', 'gorakhpur', 'bikaner', 'amravati', 'noida', 'jamshedpur', 'bhilai', 'cuttack', 'firozabad',
+  'kochi', 'nellore', 'bhavnagar', 'dehradun', 'durgapur', 'asansol', 'rourkela', 'nanded', 'kolhapur', 'ajmer',
+  'akola', 'gulbarga', 'jamnagar', 'ujjain', 'loni', 'jhansi', 'puducherry', 'jammu', 'belagavi', 'mangaluru',
+  'tirunelveli', 'malegaon', 'gaya', 'jalgaon', 'udaipur', 'maheshtala', 'davangere', 'kozhikode', 'kurnool',
+  'rajamahendravaram', 'bokaro', 'south_dumdum', 'bellary', 'patiala', 'gopalpur', 'agartala', 'bhagalpur',
+  'muzaffarnagar', 'bhatpara', 'panihati', 'latur', 'dhule', 'rohtak', 'sagar', 'korba', 'bhilwara', 'firozpur',
+  'bilaspur', 'shahjahanpur', 'bihar_sharif', 'kollam', 'hazaribagh', 'darbhanga', 'haldia', 'haridwar',
+  'shimla', 'gangtok', 'panaji', 'shillong', 'aizawl', 'imphal', 'kohima', 'itanagar', 'diu', 'kavaratti', 'port_blair',
+  'sonipat', 'panipat', 'karnal', 'ambala', 'yamunanagar', 'kurukshetra', 'hisar', 'panchkula', 'mohali', 'bathinda',
+  'pathankot', 'hoshiarpur', 'moga', 'abohar', 'sri_ganganagar', 'hanumangarh', 'mathura', 'alwar', 'bharatpur',
+  'sikar', 'pali', 'jaisalmer', 'barmer', 'chittorgarh', 'udupi', 'tumakuru', 'shivamogga', 'kolar', 'mandya',
+  'hassan', 'chikmagalur', 'dharwad', 'vijayapura', 'kalaburagi', 'bidar', 'raichur', 'koppal', 'gadag', 'haveri',
+  'uttara_kannada', 'dakshina_kannada', 'kodagu', 'chamarajanagar', 'thrissur', 'palakkad', 'malappuram', 'kannur',
+  'kasaragod', 'wayanad', 'idukki', 'kottayam', 'alappuzha', 'pathanamthitta', 'tirupati', 'anantapur', 'kadapa',
+  'kakinada', 'eluru', 'ongole', 'vizianagaram', 'srikakulam', 'machilipatnam', 'khammam', 'karimnagar', 'ramagundam',
+  'secunderabad', 'siliguri', 'darjeeling', 'jalpaiguri', 'cooch_behar', 'malda', 'murshidabad', 'nadia', 'purulia',
+  'bankura', 'midnapore', 'kharagpur', 'barasat', 'barrackpore', 'serampore', 'digha', 'purba_medinipur', 'paschim_medinipur',
+  'jhargram', 'kalimpong', 'alipurduar', 'dinajpur', 'balurghat', 'raiganj', 'krishnanagar', 'ranaghat', 'kalyani',
+  'shantipur', 'nabadwip', 'berhampore'
+];
+let CITY_LABELS = {
+  mumbai: 'Mumbai', delhi: 'Delhi', bangalore: 'Bangalore', hyderabad: 'Hyderabad', chennai: 'Chennai',
+  pune: 'Pune', kolkata: 'Kolkata', ahmedabad: 'Ahmedabad', jaipur: 'Jaipur', lucknow: 'Lucknow',
+  surat: 'Surat', kanpur: 'Kanpur', nagpur: 'Nagpur', indore: 'Indore', thane: 'Thane', bhopal: 'Bhopal',
+  visakhapatnam: 'Visakhapatnam', patna: 'Patna', vadodara: 'Vadodara', ghaziabad: 'Ghaziabad',
+  ludhiana: 'Ludhiana', agra: 'Agra', nashik: 'Nashik', faridabad: 'Faridabad', meerut: 'Meerut',
+  rajkot: 'Rajkot', varanasi: 'Varanasi', srinagar: 'Srinagar', aurangabad: 'Aurangabad', dhanbad: 'Dhanbad',
+  amritsar: 'Amritsar', navi_mumbai: 'Navi Mumbai', prayagraj: 'Prayagraj', howrah: 'Howrah',
+  ranchi: 'Ranchi', gwalior: 'Gwalior', jabalpur: 'Jabalpur', coimbatore: 'Coimbatore', vijayawada: 'Vijayawada',
+  jodhpur: 'Jodhpur', madurai: 'Madurai', raipur: 'Raipur', kota: 'Kota', guwahati: 'Guwahati',
+  chandigarh: 'Chandigarh', solapur: 'Solapur', hubli_dharwad: 'Hubli-Dharwad', bareilly: 'Bareilly',
+  moradabad: 'Moradabad', mysore: 'Mysore', gurugram: 'Gurugram', aligarh: 'Aligarh', jalandhar: 'Jalandhar',
+  tiruchirappalli: 'Tiruchirappalli', bhubaneswar: 'Bhubaneswar', salem: 'Salem', warangal: 'Warangal',
+  guntur: 'Guntur', gorakhpur: 'Gorakhpur', bikaner: 'Bikaner', amravati: 'Amravati', noida: 'Noida',
+  jamshedpur: 'Jamshedpur', bhilai: 'Bhilai', cuttack: 'Cuttack', firozabad: 'Firozabad', kochi: 'Kochi',
+  nellore: 'Nellore', bhavnagar: 'Bhavnagar', dehradun: 'Dehradun', durgapur: 'Durgapur', asansol: 'Asansol',
+  rourkela: 'Rourkela', nanded: 'Nanded', kolhapur: 'Kolhapur', ajmer: 'Ajmer', akola: 'Akola',
+  gulbarga: 'Gulbarga', jamnagar: 'Jamnagar', ujjain: 'Ujjain', loni: 'Loni', jhansi: 'Jhansi',
+  puducherry: 'Puducherry', jammu: 'Jammu', belagavi: 'Belagavi', mangaluru: 'Mangaluru', tirunelveli: 'Tirunelveli',
+  malegaon: 'Malegaon', gaya: 'Gaya', jalgaon: 'Jalgaon', udaipur: 'Udaipur', maheshtala: 'Maheshtala',
+  davangere: 'Davangere', kozhikode: 'Kozhikode', kurnool: 'Kurnool', rajamahendravaram: 'Rajamahendravaram',
+  bokaro: 'Bokaro Steel City', south_dumdum: 'South Dumdum', bellary: 'Ballari', patiala: 'Patiala',
+  gopalpur: 'Gopalpur', agartala: 'Agartala', bhagalpur: 'Bhagalpur', muzaffarnagar: 'Muzaffarnagar',
+  bhatpara: 'Bhatpara', panihati: 'Panihati', latur: 'Latur', dhule: 'Dhule', rohtak: 'Rohtak',
+  sagar: 'Sagar', korba: 'Korba', bhilwara: 'Bhilwara', firozpur: 'Firozpur', bilaspur: 'Bilaspur',
+  shahjahanpur: 'Shahjahanpur', bihar_sharif: 'Bihar Sharif', kollam: 'Kollam', hazaribagh: 'Hazaribagh',
+  darbhanga: 'Darbhanga', haldia: 'Haldia', haridwar: 'Haridwar', shimla: 'Shimla', gangtok: 'Gangtok',
+  panaji: 'Panaji', shillong: 'Shillong', aizawl: 'Aizawl', imphal: 'Imphal', kohima: 'Kohima',
+  itanagar: 'Itanagar', diu: 'Diu', kavaratti: 'Kavaratti', port_blair: 'Port Blair', sonipat: 'Sonipat',
+  panipat: 'Panipat', karnal: 'Karnal', ambala: 'Ambala', yamunanagar: 'Yamunanagar', kurukshetra: 'Kurukshetra',
+  hisar: 'Hisar', panchkula: 'Panchkula', mohali: 'Mohali', bathinda: 'Bathinda', pathankot: 'Pathankot',
+  hoshiarpur: 'Hoshiarpur', moga: 'Moga', abohar: 'Abohar', sri_ganganagar: 'Sri Ganganagar', hanumangarh: 'Hanumangarh',
+  mathura: 'Mathura', alwar: 'Alwar', bharatpur: 'Bharatpur', sikar: 'Sikar', pali: 'Pali',
+  jaisalmer: 'Jaisalmer', barmer: 'Barmer', chittorgarh: 'Chittorgarh', udupi: 'Udupi', tumakuru: 'Tumakuru',
+  shivamogga: 'Shivamogga', kolar: 'Kolar', mandya: 'Mandya', hassan: 'Hassan', chikmagalur: 'Chikmagalur',
+  dharwad: 'Dharwad', vijayapura: 'Vijayapura', kalaburagi: 'Kalaburagi', bidar: 'Bidar', raichur: 'Raichur',
+  koppal: 'Koppal', gadag: 'Gadag', haveri: 'Haveri', ...{
+    uttara_kannada: 'Uttara Kannada', dakshina_kannada: 'Dakshina Kannada', kodagu: 'Kodagu', chamarajanagar: 'Chamarajanagar',
+    thrissur: 'Thrissur', palakkad: 'Palakkad', malappuram: 'Malappuram', kannur: 'Kannur', kasaragod: 'Kasaragod',
+    wayanad: 'Wayanad', idukki: 'Idukki', kottayam: 'Kottayam', alappuzha: 'Alappuzha', pathanamthitta: 'Pathanamthitta',
+    tirupati: 'Tirupati', anantapur: 'Anantapur', kadapa: 'Kadapa', kakinada: 'Kakinada', eluru: 'Eluru',
+    ongole: 'Ongole', vizianagaram: 'Vizianagaram', srikakulam: 'Srikakulam', machilipatnam: 'Machilipatnam',
+    khammam: 'Khammam', karimnagar: 'Karimnagar', ramagundam: 'Ramagundam', secunderabad: 'Secunderabad',
+    siliguri: 'Siliguri', darjeeling: 'Darjeeling', jalpaiguri: 'Jalpaiguri', cooch_behar: 'Cooch Behar',
+    malda: 'Malda', murshidabad: 'Murshidabad', nadia: 'Nadia', purulia: 'Purulia', bankura: 'Bankura',
+    midnapore: 'Midnapore', kharagpur: 'Kharagpur', barasat: 'Barasat', barrackpore: 'Barrackpore',
+    serampore: 'Serampore', digha: 'Digha', purba_medinipur: 'Purba Medinipur', paschim_medinipur: 'Paschim Medinipur',
+    jhargram: 'Jhargram', kalimpong: 'Kalimpong', alipurduar: 'Alipurduar', dinajpur: 'Dinajpur',
+    balurghat: 'Balurghat', raiganj: 'Raiganj', krishnanagar: 'Krishnanagar', ranaghat: 'Ranaghat',
+    kalyani: 'Kalyani', shantipur: 'Shantipur', nabadwip: 'Nabadwip', berhampore: 'Berhampore'
+  }
+};
 
 let leads = [];
 let selectedLeadIds = [];
@@ -1100,8 +1298,28 @@ function randomPhone() { return '9' + Array.from({length:9}, () => randomInt(0,9
 function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString(); }
 function daysFromNow(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString(); }
 function formatCurrency(n) { return Number(n).toLocaleString('en-IN'); }
-function formatDate(iso) { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
-function formatDateTime(iso) { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); }
+function formatDate(iso) { 
+  if (!iso) return '—'; 
+  return new Date(iso).toLocaleDateString('en-IN', { 
+    day: '2-digit', 
+    month: 'short', 
+    year: 'numeric',
+    timeZone: 'Asia/Kolkata'
+  }); 
+}
+function formatDateTime(iso) { 
+  if (!iso) return '—'; 
+  const d = new Date(iso); 
+  return d.toLocaleDateString('en-IN', { 
+    day: '2-digit', 
+    month: 'short',
+    timeZone: 'Asia/Kolkata'
+  }) + ' ' + d.toLocaleTimeString('en-IN', { 
+    hour: '2-digit', 
+    minute: '2-digit',
+    timeZone: 'Asia/Kolkata'
+  }); 
+}
 function getAging(assignedAt) {
   if (!assignedAt) return '—';
   const start = new Date(assignedAt);
@@ -1110,6 +1328,22 @@ function getAging(assignedAt) {
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   return `${diffDays} Days`;
 }
+function isTodayIST(iso) {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const now = new Date();
+  const dStr = d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const nowStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+  return dStr === nowStr;
+}
+
+function isSameDayIST(iso1, iso2) {
+  if (!iso1 || !iso2) return false;
+  const d1Str = new Date(iso1).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const d2Str = new Date(iso2).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+  return d1Str === d2Str;
+}
+
 function timeAgo(iso) {
   if (!iso) return '—';
   const s = Math.floor((Date.now() - new Date(iso)) / 1000);
@@ -1129,23 +1363,32 @@ async function fetchAPI(endpoint, options = {}) {
   };
   
   try {
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(url, { 
+      ...options, 
+      headers 
+    });
     
     if (response.status === 401) {
       const data = await response.json().catch(() => ({}));
       const msg = data.message || 'Session expired';
       if (APP.token) {
-        handleLogout();
+        handleLogout(true);
       }
       throw new Error(msg);
     }
 
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Something went wrong');
-    return data;
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || `Server error (${response.status})`);
+    }
+
+    return await response.json();
   } catch (err) {
-    if (err.message !== 'Invalid token' && err.message !== 'Session expired' && err.message !== 'Unauthorized') {
-      toast(err.message, 'error');
+    if (err.name === 'AbortError') {
+      throw new Error('Request timed out');
+    }
+    if (err.message === 'Failed to fetch') {
+      throw new Error('Connection failed. Please check if the server is running.');
     }
     throw err;
   }
@@ -1184,6 +1427,11 @@ async function handleLogin(e) {
   const email = document.getElementById('loginEmail').value;
   const password = document.getElementById('loginPassword').value;
   const btn = document.getElementById('loginSubmitBtn');
+  const loginError = document.getElementById('loginError');
+  
+  if (loginError) {
+    loginError.classList.add('hidden');
+  }
   
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
@@ -1207,26 +1455,42 @@ async function handleLogin(e) {
       await initApp();
     }
   } catch (err) {
-    // Error handled by fetchAPI toast
+    if (loginError) {
+      loginError.classList.remove('hidden');
+    }
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
   }
 }
 
-function handleLogout() {
+function handleLogout(silent = false) {
   APP.token = null;
   APP.currentUserId = null;
+  APP.currentRole = null;
+  APP.userName = '';
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   document.getElementById('appContainer').style.display = 'none';
   document.getElementById('loginOverlay').style.display = 'flex';
-  toast('Logged out successfully', 'info');
+  if (!silent) {
+    toast('Logged out successfully', 'info');
+  }
 }
 
 function changePage(delta) {
   APP.currentPaginationPage += delta;
   fetchLeads();
+}
+
+function changeWorkHistoryPage(delta) {
+  APP.workHistoryPage += delta;
+  renderPage();
+}
+
+function changeEmailHistoryPage(delta) {
+  APP.emailHistoryPage += delta;
+  renderPage();
 }
 
 function buildLeadsUrl() {
@@ -1237,6 +1501,7 @@ function buildLeadsUrl() {
     dir: leadsFilter.dir,
     search: leadsFilter.search,
     status: leadsFilter.status.join(','),
+    city: (leadsFilter.city || []).join(','),
     loanType: leadsFilter.loanType.join(','),
     source: leadsFilter.source.join(','),
     agent: leadsFilter.agent.join(','),
@@ -1283,17 +1548,18 @@ async function initApp() {
     }
 
     const [
-      leadsData, usersData, teamsData, loanTypesData, sourcesData, distRulesData,
+      leadsData, usersData, teamsData, emailTemplatesData, loanTypesData, sourcesData, distRulesData,
       allocHistoryData, callsData, emailsData, loanLabelsData, companyProfileData,
       leadStatusesData, leadStatusLabelsData, leadPrioritiesData, leadPriorityLabelsData,
-      targetsData, emailTemplatesData
+      targetsData, leadCategoriesData, leadCategoryLabelsData, citiesData, cityLabelsData
     ] = await Promise.all([
-      fetchAPI(buildLeadsUrl()),
-      fetchAPI('/users'),
-      fetchAPI('/teams'),
-      fetchAPI('/settings/loan_types'),
-      fetchAPI('/settings/sources'),
-      fetchAPI('/settings/distribution_rules'),
+      fetchAPI(buildLeadsUrl()).catch(err => { console.error('Leads fetch error:', err); return { leads: [], total: 0 }; }),
+      fetchAPI('/users').catch(err => { console.error('Users fetch error:', err); return []; }),
+      fetchAPI('/teams').catch(err => { console.error('Teams fetch error:', err); return []; }),
+      fetchAPI('/email-templates').catch(() => []),
+      fetchAPI('/settings/loan_types').catch(() => []),
+      fetchAPI('/settings/sources').catch(() => []),
+      fetchAPI('/settings/distribution_rules').catch(() => ({})),
       fetchAPI('/settings/allocation_history').catch(() => []),
       fetchAPI('/calls').catch(() => []),
       fetchAPI('/emails').catch(() => []),
@@ -1304,7 +1570,10 @@ async function initApp() {
       fetchAPI('/settings/lead_priorities').catch(() => []),
       fetchAPI('/settings/lead_priority_labels').catch(() => ({})),
       fetchAPI('/settings/targets').catch(() => ({})),
-      fetchAPI('/email-templates').catch(() => [])
+      fetchAPI('/settings/lead_categories').catch(() => []),
+      fetchAPI('/settings/lead_category_labels').catch(() => ({})),
+      fetchAPI('/settings/cities').catch(() => []),
+      fetchAPI('/settings/city_labels').catch(() => ({}))
     ]);
     
     setLeads(leadsData);
@@ -1340,6 +1609,18 @@ async function initApp() {
     if (leadPriorityLabelsData && typeof leadPriorityLabelsData === 'object' && !Array.isArray(leadPriorityLabelsData)) {
       PRIORITY_LABELS = { ...PRIORITY_LABELS, ...leadPriorityLabelsData };
     }
+    if (leadCategoriesData && leadCategoriesData.length > 0) {
+      LEAD_CATEGORIES = leadCategoriesData;
+    }
+    if (leadCategoryLabelsData && typeof leadCategoryLabelsData === 'object' && !Array.isArray(leadCategoryLabelsData)) {
+      CATEGORY_LABELS = { ...CATEGORY_LABELS, ...leadCategoryLabelsData };
+    }
+    if (citiesData && citiesData.length > 0) {
+      CITIES = citiesData;
+    }
+    if (cityLabelsData && typeof cityLabelsData === 'object' && !Array.isArray(cityLabelsData)) {
+      CITY_LABELS = { ...CITY_LABELS, ...cityLabelsData };
+    }
     
     updateUserUI();
     navigateTo('dashboard');
@@ -1349,9 +1630,11 @@ async function initApp() {
     if (err.message === 'Failed to fetch') {
       errorMsg = 'Could not connect to the server. Please check if the backend is running.';
     }
-    toast('Initialization Error: ' + errorMsg, 'error');
-    if (err.message === 'Invalid token' || err.message === 'Session expired' || err.message === 'Unauthorized') {
-      handleLogout();
+    if (err.message === 'Invalid token' || err.message === 'Session expired' || err.message === 'Unauthorized' || err.message === 'Authentication required') {
+      handleLogout(true);
+      toast('Your session has expired. Please login again.', 'info');
+    } else {
+      toast('Initialization Error: ' + errorMsg, 'error');
     }
   }
 }
@@ -1367,7 +1650,65 @@ function toast(message, type = 'success') {
 }
 
 function openModal(id) { document.getElementById(id).classList.add('show'); }
-function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+function closeModal(id) { 
+  document.getElementById(id).classList.remove('show'); 
+  if (id === 'importModal' && typeof clearImportSelection === 'function') {
+    clearImportSelection();
+  }
+}
+
+function showProgressUI(title, text, isDelete = false) {
+  const overlay = document.getElementById('progressOverlay');
+  const content = document.getElementById('progressOverlayContent');
+  
+  const titleEl = document.getElementById('progressTitle');
+  if (titleEl) titleEl.textContent = title || 'Processing';
+  
+  const textEl = document.getElementById('progressText');
+  if (textEl) textEl.textContent = text || 'Please wait...';
+  
+  const fgCircle = document.getElementById('progressForegroundCircle');
+  if (fgCircle) {
+      if (isDelete) {
+          fgCircle.setAttribute('stroke', '#ef4444');
+      } else {
+          fgCircle.setAttribute('stroke', '#4285f4');
+      }
+  }
+  
+  updateProgressUI(0);
+  
+  if (overlay) overlay.classList.remove('hidden');
+  // Trigger reflow
+  if (overlay) void overlay.offsetWidth;
+  
+  if (overlay) overlay.classList.remove('opacity-0');
+  if (content) content.classList.remove('scale-95');
+}
+
+function updateProgressUI(percent, text) {
+  const maskCircle = document.getElementById('progressMaskCircle');
+  const percentText = document.getElementById('progressPercent');
+  const textEl = document.getElementById('progressText');
+  if (text && textEl) textEl.textContent = text;
+  
+  if (percentText) percentText.textContent = Math.round(percent) + '%';
+  // circumference is 282.743
+  const offset = 282.743 - (percent / 100) * 282.743;
+  if (maskCircle) maskCircle.style.strokeDashoffset = offset;
+}
+
+function hideProgressUI() {
+  const overlay = document.getElementById('progressOverlay');
+  const content = document.getElementById('progressOverlayContent');
+  
+  if (overlay) overlay.classList.add('opacity-0');
+  if (content) content.classList.add('scale-95');
+  
+  setTimeout(() => {
+    if (overlay) overlay.classList.add('hidden');
+  }, 300);
+}
 
 function showChangePasswordModal() {
   document.getElementById('changePasswordForm').reset();
@@ -1412,13 +1753,17 @@ async function handleChangePasswordSubmit(e) {
 let currentConfirmCallback = null;
 
 function showConfirmModal(title, message, callback) {
-  document.getElementById('confirmModalTitle').textContent = title;
-  document.getElementById('confirmModalMessage').textContent = message;
+  const titleEl = document.getElementById('confirmModalTitle');
+  if (titleEl) titleEl.textContent = title;
+  const msgEl = document.getElementById('confirmModalMessage');
+  if (msgEl) msgEl.textContent = message;
   currentConfirmCallback = callback;
   
   const btn = document.getElementById('confirmModalBtn');
-  btn.disabled = false;
-  btn.classList.remove('opacity-50', 'cursor-not-allowed');
+  if (btn) {
+    btn.disabled = false;
+    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+  }
   
   openModal('confirmModal');
 }
@@ -1437,7 +1782,12 @@ function getTeam(id) {
   const targetId = typeof id === 'object' ? (id._id || id.id) : id;
   return TEAMS.find(t => t.id === targetId || t._id === targetId);
 }
-function getLeadCalls(leadId) { return callLogs.filter(c => c.lead_id === leadId).sort((a,b) => new Date(b.created_at) - new Date(a.created_at)); }
+function getLeadCalls(leadId) { 
+  return callLogs.filter(c => {
+    const cLeadId = typeof c.lead_id === 'object' ? (c.lead_id._id || c.lead_id.id) : c.lead_id;
+    return cLeadId === leadId;
+  }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at)); 
+}
 
 function toggleLeadSelection(id, checked) {
   if (checked) {
@@ -1464,9 +1814,12 @@ async function bulkDeleteLeads() {
     let successCount = 0;
     const total = selectedLeadIds.length;
     
+    showProgressUI('Deleting Leads', `Deleting 0 of ${total}...`, true);
+    
     // We'll do it sequentially to keep it simple and follow current pattern
     // In a real app we'd have a bulk endpoint
-    for (const id of selectedLeadIds) {
+    for (let i = 0; i < total; i++) {
+      const id = selectedLeadIds[i];
       try {
         await fetchAPI(`/leads/${id}`, { method: 'DELETE' });
         leads = leads.filter(l => l.id !== id && l._id !== id);
@@ -1476,9 +1829,14 @@ async function bulkDeleteLeads() {
       } catch (err) {
         console.error(`Failed to delete lead ${id}`, err);
       }
+      const pct = ((i + 1) / total) * 100;
+      updateProgressUI(pct, `Deleting ${i + 1} of ${total}...`);
     }
     
-    toast(`Successfully deleted ${successCount} of ${total} leads`);
+    hideProgressUI();
+    setTimeout(() => {
+      toast(`Successfully deleted ${successCount} of ${total} leads`);
+    }, 300);
     selectedLeadIds = [];
     renderPage();
   });
@@ -1571,6 +1929,15 @@ function getPriorityDot(priority) {
 function navigateTo(page) {
   const isAlreadyActive = APP.currentPage === page;
   APP.currentPage = page;
+  
+  // Clear lead filter when navigating via sidebar/manual calls
+  if (page !== 'followups') {
+    APP.followUpLeadFilter = null;
+  } else if (!isAlreadyActive) {
+    // If navigating to followups fresh, clear lead filter too
+    APP.followUpLeadFilter = null;
+  }
+
   document.querySelectorAll('.sidebar-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
   
   // Show/hide team submenu
@@ -1697,7 +2064,8 @@ function updateUserUI() {
 
   // Update calling count
   const myLeads = getVisibleLeads().filter(l => l.status !== 'disbursed' && l.status !== 'rejected' && l.status !== 'dead' && l.status !== 'not_interested');
-  document.getElementById('callingCount').textContent = myLeads.length;
+  const callingCountEl = document.getElementById('callingCount');
+  if (callingCountEl) callingCountEl.textContent = myLeads.length;
 
   // Generate real-time notifications based on loaded data
   generateNotifications();
@@ -1716,6 +2084,7 @@ function renderPage() {
     case 'dashboard': c.innerHTML = renderDashboard(); initDashboardCharts(); break;
     case 'leads': c.innerHTML = renderLeads(); break;
     case 'pipeline': c.innerHTML = renderPipeline(); break;
+    case 'followups': c.innerHTML = renderFollowUps(); break;
     case 'calling': c.innerHTML = renderCallingQueue(); break;
     case 'footprints': c.innerHTML = renderFootprints(); break;
     case 'reports': c.innerHTML = renderReports(); break;
@@ -1764,12 +2133,70 @@ function renderDashboard() {
   const contacted = vl.filter(l => ['contacted','interested','documents_pending','login_done','disbursed'].includes(l.status)).length;
   const converted = vl.filter(l => l.status === 'disbursed').length;
   const convRate = totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(1) : 0;
+  const todayIST = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowIST = tomorrowDate.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+
   const todayFollowups = vl.filter(l => {
     const calls = getLeadCalls(l.id);
-    return calls.some(c => c.follow_up_at && new Date(c.follow_up_at).toDateString() === new Date().toDateString());
+    return calls.some(c => c.follow_up_at && new Date(c.follow_up_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) === todayIST && c.follow_up_status !== 'done');
+  }).length;
+  const tomorrowFollowups = vl.filter(l => {
+    const calls = getLeadCalls(l.id);
+    return calls.some(c => c.follow_up_at && new Date(c.follow_up_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) === tomorrowIST && c.follow_up_status !== 'done');
+  }).length;
+  const upcomingFollowups = vl.filter(l => {
+    const calls = getLeadCalls(l.id);
+    return calls.some(c => {
+      if (!c.follow_up_at) return false;
+      const dStr = new Date(c.follow_up_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+      // If it's not today and not tomorrow, and it's in the future
+      return dStr !== todayIST && dStr !== tomorrowIST && new Date(c.follow_up_at).getTime() > new Date().getTime() && c.follow_up_status !== 'done';
+    });
   }).length;
   const totalAmount = vl.reduce((s, l) => s + l.amount_requested, 0);
   const hotLeads = vl.filter(l => l.priority === 'hot' && !['disbursed','rejected','dead','not_interested'].includes(l.status)).length;
+
+  // Overdue follow-ups
+  const overdueFollowupLeads = vl.map(l => {
+    const calls = getLeadCalls(l.id);
+    const overdueCalls = calls.filter(c => {
+      if (!c.follow_up_at || c.follow_up_status === 'done') return false;
+      const d = new Date(c.follow_up_at);
+      const now = new Date();
+      return d < now && !isTodayIST(c.follow_up_at);
+    });
+    const fu = overdueCalls.length > 0 ? overdueCalls.sort((a,b) => new Date(a.follow_up_at) - new Date(b.follow_up_at))[0] : null;
+    return fu ? { ...l, follow_up_at: fu.follow_up_at, pendingCount: overdueCalls.length } : null;
+  }).filter(Boolean).sort((a,b) => new Date(a.follow_up_at) - new Date(b.follow_up_at));
+
+  const overdueFollowupsCount = vl.filter(l => {
+    const calls = getLeadCalls(l.id);
+    return calls.some(c => {
+      if (!c.follow_up_at || c.follow_up_status === 'done') return false;
+      const d = new Date(c.follow_up_at);
+      const now = new Date();
+      return d < now && !isTodayIST(c.follow_up_at);
+    });
+  }).length;
+
+  const overdueFollowupHTML = overdueFollowupLeads.map(l => `
+    <div class="flex items-center gap-3 py-3 border-b border-surface-800 last:border-0 cursor-pointer hover:bg-surface-800/50 -mx-2 px-2 rounded" onclick="showLeadDetail('${l.id}')">
+      <div class="w-8 h-8 rounded-full bg-rose-600/20 flex items-center justify-center flex-shrink-0"><i class="fas fa-exclamation-triangle text-xs text-rose-400"></i></div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <p class="text-sm text-white font-medium truncate">${l.name}</p>
+            <span class="w-5 h-5 rounded-full bg-rose-500/20 text-[10px] text-rose-400 flex items-center justify-center font-bold border border-rose-500/30" title="Pending follow-ups">${l.pendingCount}</span>
+          </div>
+          <span class="text-[10px] text-rose-400 font-bold">${formatDate(l.follow_up_at)}</span>
+        </div>
+        <p class="text-xs text-surface-500">${LOAN_LABELS[l.loan_type] || l.loan_type} — Aging: ${getAging(l.assigned_at)}</p>
+      </div>
+      <span class="${getStatusBadgeClass(l.status)}">${STATUS_LABELS[l.status]}</span>
+    </div>
+  `).join('') || '<p class="text-surface-500 text-sm py-4 text-center">No overdue follow-ups</p>';
 
   // Agent leaderboard (for admin/tl)
   let leaderboardHTML = '';
@@ -1778,8 +2205,8 @@ function renderDashboard() {
     const agentStats = agents.map(a => {
       const aLeads = leads.filter(l => l.assigned_agent_id === a.id);
       const aConverted = aLeads.filter(l => l.status === 'disbursed').length;
-      const aCalls = new Set(callLogs.filter(c => c.agent_id === a.id).map(c => `${c.lead_id}_${new Date(c.created_at).toDateString()}`)).size;
-      const aFollowups = aLeads.filter(l => { const calls = getLeadCalls(l.id); return calls.some(c => c.follow_up_at && new Date(c.follow_up_at).toDateString() === new Date().toDateString()); }).length;
+      const aCalls = new Set(callLogs.filter(c => c.agent_id === a.id).map(c => `${c.lead_id}_${new Date(c.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}`)).size;
+      const aFollowups = aLeads.filter(l => { const calls = getLeadCalls(l.id); return calls.some(c => c.follow_up_at && isTodayIST(c.follow_up_at) && c.follow_up_status !== 'done'); }).length;
       return { ...a, total: aLeads.length, converted: aConverted, calls: aCalls, followups: aFollowups };
     }).sort((a, b) => b.converted - a.converted);
 
@@ -1808,7 +2235,7 @@ function renderDashboard() {
       const teamAgents = USERS.filter(u => u.team_id === t.id && u.active);
       const teamLeads = leads.filter(l => teamAgents.some(a => a.id === l.assigned_agent_id));
       const teamConverted = teamLeads.filter(l => l.status === 'disbursed').length;
-      const teamCalls = new Set(callLogs.filter(c => teamAgents.some(a => a.id === c.agent_id)).map(c => `${c.lead_id}_${new Date(c.created_at).toDateString()}`)).size;
+      const teamCalls = new Set(callLogs.filter(c => teamAgents.some(a => a.id === c.agent_id)).map(c => `${c.lead_id}_${new Date(c.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}`)).size;
       return { ...t, agentCount: teamAgents.length, total: teamLeads.length, converted: teamConverted, calls: teamCalls };
     }).sort((a, b) => b.converted - a.converted);
 
@@ -1835,7 +2262,7 @@ function renderDashboard() {
   // Agent personal stats
   let personalHTML = '';
   if (APP.currentRole === 'agent') {
-    const myCallsCount = new Set(callLogs.filter(c => c.agent_id === APP.currentUserId).map(c => `${c.lead_id}_${new Date(c.created_at).toDateString()}`)).size;
+    const myCallsCount = new Set(callLogs.filter(c => c.agent_id === APP.currentUserId).map(c => `${c.lead_id}_${new Date(c.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}`)).size;
     const myConverted = vl.filter(l => l.status === 'disbursed').length;
     const myInterested = vl.filter(l => l.status === 'interested').length;
     const myDocs = vl.filter(l => l.status === 'documents_pending').length;
@@ -1861,25 +2288,93 @@ function renderDashboard() {
       <div class="flex-1 min-w-0">
         <p class="text-sm text-white truncate"><span class="font-medium">${agent.name}</span> called <span class="font-medium">${lead.name}</span></p>
         <p class="text-xs text-surface-500 mt-0.5">${c.outcome} — ${timeAgo(c.created_at)}</p>
+        ${c.follow_up_at ? `<p class="text-[10px] text-amber-400 mt-1 font-medium"><i class="fas fa-calendar-alt mr-1"></i> Follow-up: ${formatDateTime(c.follow_up_at)}</p>` : ''}
       </div>
     </div>`;
   }).join('');
 
   // Follow-ups today
-  const followupLeads = vl.filter(l => {
+  const followupLeads = vl.map(l => {
     const calls = getLeadCalls(l.id);
-    return calls.some(c => c.follow_up_at && new Date(c.follow_up_at).toDateString() === new Date().toDateString());
-  }).slice(0, 5);
+    const todayCalls = calls.filter(c => c.follow_up_at && isTodayIST(c.follow_up_at) && c.follow_up_status !== 'done');
+    const fu = todayCalls.length > 0 ? todayCalls.sort((a,b) => new Date(a.follow_up_at) - new Date(b.follow_up_at))[0] : null;
+    return fu ? { ...l, follow_up_at: fu.follow_up_at, pendingCount: todayCalls.length } : null;
+  }).filter(Boolean).sort((a,b) => new Date(a.follow_up_at) - new Date(b.follow_up_at));
+
   const followupHTML = followupLeads.map(l => `
     <div class="flex items-center gap-3 py-3 border-b border-surface-800 last:border-0 cursor-pointer hover:bg-surface-800/50 -mx-2 px-2 rounded" onclick="showLeadDetail('${l.id}')">
       <div class="w-8 h-8 rounded-full bg-amber-600/20 flex items-center justify-center flex-shrink-0"><i class="fas fa-clock text-xs text-amber-400"></i></div>
       <div class="flex-1 min-w-0">
-        <p class="text-sm text-white font-medium truncate">${l.name}</p>
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <p class="text-sm text-white font-medium truncate">${l.name}</p>
+            <span class="w-5 h-5 rounded-full bg-amber-500/20 text-[10px] text-amber-400 flex items-center justify-center font-bold border border-amber-500/30" title="Pending follow-ups">${l.pendingCount}</span>
+          </div>
+          <span class="text-[10px] text-amber-400 font-bold">${formatDate(l.follow_up_at)}</span>
+        </div>
         <p class="text-xs text-surface-500">${LOAN_LABELS[l.loan_type] || l.loan_type} — Aging: ${getAging(l.assigned_at)}</p>
       </div>
       <span class="${getStatusBadgeClass(l.status)}">${STATUS_LABELS[l.status]}</span>
     </div>
   `).join('') || '<p class="text-surface-500 text-sm py-4 text-center">No follow-ups today</p>';
+
+  // Follow-ups tomorrow
+  const followupTomorrowLeads = vl.map(l => {
+    const calls = getLeadCalls(l.id);
+    const tomorrowDate = new Date();
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrowCalls = calls.filter(c => c.follow_up_at && isSameDayIST(c.follow_up_at, tomorrowDate) && c.follow_up_status !== 'done');
+    const fu = tomorrowCalls.length > 0 ? tomorrowCalls.sort((a,b) => new Date(a.follow_up_at) - new Date(b.follow_up_at))[0] : null;
+    return fu ? { ...l, follow_up_at: fu.follow_up_at, pendingCount: tomorrowCalls.length } : null;
+  }).filter(Boolean).sort((a,b) => new Date(a.follow_up_at) - new Date(b.follow_up_at));
+
+  const followupTomorrowHTML = followupTomorrowLeads.map(l => `
+    <div class="flex items-center gap-3 py-3 border-b border-surface-800 last:border-0 cursor-pointer hover:bg-surface-800/50 -mx-2 px-2 rounded" onclick="showLeadDetail('${l.id}')">
+      <div class="w-8 h-8 rounded-full bg-sky-600/20 flex items-center justify-center flex-shrink-0"><i class="fas fa-calendar-day text-xs text-sky-400"></i></div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <p class="text-sm text-white font-medium truncate">${l.name}</p>
+            <span class="w-5 h-5 rounded-full bg-sky-500/20 text-[10px] text-sky-400 flex items-center justify-center font-bold border border-sky-500/30" title="Pending follow-ups">${l.pendingCount}</span>
+          </div>
+          <span class="text-[10px] text-sky-400 font-bold">${formatDate(l.follow_up_at)}</span>
+        </div>
+        <p class="text-xs text-surface-500">${LOAN_LABELS[l.loan_type] || l.loan_type} — Aging: ${getAging(l.assigned_at)}</p>
+      </div>
+      <span class="${getStatusBadgeClass(l.status)}">${STATUS_LABELS[l.status]}</span>
+    </div>
+  `).join('') || '<p class="text-surface-500 text-sm py-4 text-center">No follow-ups tomorrow</p>';
+
+  // Upcoming follow-ups
+  const followupUpcomingLeads = vl.map(l => {
+    const calls = getLeadCalls(l.id);
+    const upcomingCalls = calls.filter(c => {
+      if (!c.follow_up_at || c.follow_up_status === 'done') return false;
+      const tomorrowDate = new Date();
+      tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+      tomorrowDate.setHours(23, 59, 59, 999);
+      return new Date(c.follow_up_at).getTime() > tomorrowDate.getTime();
+    });
+    const fu = upcomingCalls.length > 0 ? upcomingCalls.sort((a,b) => new Date(a.follow_up_at) - new Date(b.follow_up_at))[0] : null;
+    return fu ? { ...l, follow_up_at: fu.follow_up_at, pendingCount: upcomingCalls.length } : null;
+  }).filter(Boolean).sort((a,b) => new Date(a.follow_up_at) - new Date(b.follow_up_at));
+
+  const followupUpcomingHTML = followupUpcomingLeads.map(l => `
+    <div class="flex items-center gap-3 py-3 border-b border-surface-800 last:border-0 cursor-pointer hover:bg-surface-800/50 -mx-2 px-2 rounded" onclick="showLeadDetail('${l.id}')">
+      <div class="w-8 h-8 rounded-full bg-brand-600/20 flex items-center justify-center flex-shrink-0"><i class="fas fa-calendar-alt text-xs text-brand-400"></i></div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <p class="text-sm text-white font-medium truncate">${l.name}</p>
+            <span class="w-5 h-5 rounded-full bg-brand-500/20 text-[10px] text-brand-400 flex items-center justify-center font-bold border border-brand-500/30" title="Pending follow-ups">${l.pendingCount}</span>
+          </div>
+          <span class="text-[10px] text-brand-400 font-bold">${formatDate(l.follow_up_at)}</span>
+        </div>
+        <p class="text-xs text-surface-500">${LOAN_LABELS[l.loan_type] || l.loan_type} — Aging: ${getAging(l.assigned_at)}</p>
+      </div>
+      <span class="${getStatusBadgeClass(l.status)}">${STATUS_LABELS[l.status]}</span>
+    </div>
+  `).join('') || '<p class="text-surface-500 text-sm py-4 text-center">No upcoming follow-ups</p>';
 
   // Hot leads
   const hotLeadsList = vl.filter(l => l.priority === 'hot' && !['disbursed','rejected','dead','not_interested'].includes(l.status)).slice(0, 5);
@@ -1902,15 +2397,15 @@ function renderDashboard() {
         </div>
         <div class="flex items-center gap-3">
           ${renderAssignmentFilter()}
-          ${APP.currentRole === 'admin' ? '<button class="btn btn-secondary btn-sm" onclick="openModal(\'importModal\')"><i class="fas fa-file-import"></i> Bulk Import</button>' : ''}
+          ${APP.currentRole === 'admin' ? '<button class="btn !bg-[#4285F4] !text-white hover:!bg-[#3367d6] hover:shadow-lg hover:shadow-[#4285F4]/20 border-none transition-all rounded-md font-semibold px-4 py-2 text-xs flex items-center gap-2" onclick="openModal(\'importModal\')"><i class="fas fa-file-import"></i> Bulk Import</button>' : ''}
         </div>
       </div>
 
       <!-- Stat cards -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div class="card stat-card emerald">
+        <div class="card stat-card google-yellow">
           <div class="flex items-center gap-3 mb-3">
-            <div class="w-10 h-10 rounded-lg bg-brand-600/15 flex items-center justify-center"><i class="fas fa-users text-brand-400"></i></div>
+            <div class="w-10 h-10 rounded-lg bg-[#F4B400]/15 flex items-center justify-center"><i class="fas fa-users text-[#F4B400]"></i></div>
             <span class="text-sm text-surface-400">Total Leads</span>
           </div>
           <p class="text-3xl font-display font-bold text-white">${totalLeads}</p>
@@ -1945,13 +2440,13 @@ function renderDashboard() {
       ${personalHTML}
 
       <!-- Charts row -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div class="card fade-in">
           <h3 class="font-display font-bold text-white mb-4">Lead Funnel</h3>
           <div style="height:280px"><canvas id="funnelChart"></canvas></div>
         </div>
         <div class="card fade-in">
-          <h3 class="font-display font-bold text-white mb-4">Loan Types</h3>
+          <h3 class="font-display font-bold text-white mb-4">Product Types</h3>
           <div style="height:280px"><canvas id="loanTypeChart"></canvas></div>
         </div>
         <div class="card fade-in">
@@ -1962,14 +2457,60 @@ function renderDashboard() {
           <h3 class="font-display font-bold text-white mb-4">${APP.currentRole === 'admin' ? 'Team Comparison' : APP.currentRole === 'tl' ? 'Agent Performance' : 'Lead Sources'}</h3>
           <div style="height:280px"><canvas id="secondaryChart"></canvas></div>
         </div>
+        <div class="card fade-in">
+          <h3 class="font-display font-bold text-white mb-4">Lead Categories</h3>
+          <div style="height:280px"><canvas id="leadCategoryChart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 mb-6">
+        <div class="card fade-in">
+          <h3 class="font-display font-bold text-white mb-4">Cities Lead Distribution</h3>
+          <div id="cityTreeMap" style="height:400px"></div>
+        </div>
       </div>
 
       <!-- Bottom row -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <div class="card fade-in">
-          <h3 class="font-display font-bold text-white mb-3">Follow-ups Today <span class="text-brand-400 text-sm font-normal">(${todayFollowups})</span></h3>
-          ${followupHTML}
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="card fade-in border-l-4 border-rose-500/50 flex flex-col h-full">
+          <h3 class="font-display font-bold text-white mb-3 flex items-center justify-between flex-shrink-0">
+            Overdue
+            <span class="text-rose-400 text-sm font-normal bg-rose-400/10 px-2 py-0.5 rounded-full">${overdueFollowupsCount}</span>
+          </h3>
+          <div class="overflow-y-auto flex-1 max-h-[400px] pr-1 custom-scrollbar">
+            ${overdueFollowupHTML}
+          </div>
         </div>
+        <div class="card fade-in border-l-4 border-amber-500/50 flex flex-col h-full">
+          <h3 class="font-display font-bold text-white mb-3 flex items-center justify-between flex-shrink-0">
+            Follow-ups Today
+            <span class="text-amber-400 text-sm font-normal bg-amber-400/10 px-2 py-0.5 rounded-full">${todayFollowups}</span>
+          </h3>
+          <div class="overflow-y-auto flex-1 max-h-[400px] pr-1 custom-scrollbar">
+            ${followupHTML}
+          </div>
+        </div>
+        <div class="card fade-in border-l-4 border-sky-500/50 flex flex-col h-full">
+          <h3 class="font-display font-bold text-white mb-3 flex items-center justify-between flex-shrink-0">
+            Follow-ups Tomorrow
+            <span class="text-sky-400 text-sm font-normal bg-sky-400/10 px-2 py-0.5 rounded-full">${tomorrowFollowups}</span>
+          </h3>
+          <div class="overflow-y-auto flex-1 max-h-[400px] pr-1 custom-scrollbar">
+            ${followupTomorrowHTML}
+          </div>
+        </div>
+        <div class="card fade-in border-l-4 border-brand-500/50 flex flex-col h-full">
+          <h3 class="font-display font-bold text-white mb-3 flex items-center justify-between flex-shrink-0">
+            Upcoming
+            <span class="text-brand-400 text-sm font-normal bg-brand-400/10 px-2 py-0.5 rounded-full">${upcomingFollowups}</span>
+          </h3>
+          <div class="overflow-y-auto flex-1 max-h-[400px] pr-1 custom-scrollbar">
+            ${followupUpcomingHTML}
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <div class="card fade-in">
           <h3 class="font-display font-bold text-white mb-3">Hot Leads <span class="text-rose-400 text-sm font-normal">(${hotLeads})</span></h3>
           ${hotHTML}
@@ -2018,6 +2559,29 @@ function initDashboardCharts() {
     });
   }
 
+  // Lead Categories donut chart
+  const categoryData = LEAD_CATEGORIES.map(cat => vl.filter(l => (l.lead_category || 'individual').toLowerCase() === cat).length);
+  const categoryLabels = LEAD_CATEGORIES.map(cat => CATEGORY_LABELS[cat] || (cat.charAt(0).toUpperCase() + cat.slice(1)));
+  const categoryColors = ['#4285f4', '#ea4335', '#fbbc05', '#34a853'];
+
+  const ctxCategory = document.getElementById('leadCategoryChart');
+  if (ctxCategory) {
+    if (APP.charts.category) APP.charts.category.destroy();
+    APP.charts.category = new Chart(ctxCategory, {
+      type: 'doughnut',
+      data: {
+        labels: categoryLabels,
+        datasets: [{ data: categoryData, backgroundColor: categoryColors.slice(0, categoryLabels.length), borderColor: 'transparent', borderWidth: 0, borderRadius: 6 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: theme.tickColor } } }
+      }
+    });
+  }
+
+  initTreemap();
+  
   // Secondary chart
   const ctx2 = document.getElementById('secondaryChart');
   if (ctx2) {
@@ -2176,10 +2740,87 @@ function initDashboardCharts() {
   }
 }
 
+function initTreemap() {
+  const container = document.getElementById('cityTreeMap');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  const vl = getVisibleLeads();
+  const cityCounts = {};
+  CITIES.forEach(c => cityCounts[c] = 0);
+  vl.forEach(l => {
+    const city = (l.city || '').toLowerCase();
+    if (cityCounts.hasOwnProperty(city)) {
+      cityCounts[city]++;
+    }
+  });
+  
+  const data = CITIES.map(c => ({ name: CITY_LABELS[c] || c, value: cityCounts[c] })).filter(d => d.value > 0);
+  if (data.length === 0) {
+    container.innerHTML = '<div class="text-surface-500 p-4">No data</div>';
+    return;
+  }
+  
+  const root = d3.hierarchy({children: data})
+    .sum(d => d.value)
+    .sort((a, b) => b.value - a.value);
+    
+  d3.treemap()
+    .size([container.offsetWidth, container.offsetHeight])
+    .padding(0)(root);
+    
+  const svg = d3.select(container)
+    .append("svg")
+    .attr("width", "100%")
+    .attr("height", "100%");
+    
+  const color = d3.scaleOrdinal(d3.schemeCategory10);
+    
+  svg.selectAll("rect")
+    .data(root.leaves())
+    .enter()
+    .append("rect")
+    .attr('x', d => d.x0)
+    .attr('y', d => d.y0)
+    .attr('width', d => d.x1 - d.x0)
+    .attr('height', d => d.y1 - d.y0)
+    .style("stroke", "none")
+    .style("fill", (d, i) => color(i));
+    
+  svg.selectAll("text")
+    .data(root.leaves())
+    .enter()
+    .append("text")
+    .attr("x", d => d.x0 + 5)
+    .attr("y", d => d.y0 + 15)
+    .text(d => `${d.data.name} (${d.data.value})`)
+    .attr("font-size", "10px")
+    .attr("fill", "white");
+}
+
 // ========== LEADS TABLE ==========
 
 function getFilteredLeads() {
   let vl = getVisibleLeads();
+
+  // Enrich with latest follow-up date
+  vl = vl.map(l => {
+    const leadId = l.id || l._id;
+    const logs = callLogs.filter(log => {
+      const logLeadId = log.lead_id && typeof log.lead_id === 'object' ? (log.lead_id._id || log.lead_id.id) : log.lead_id;
+      return logLeadId === leadId;
+    });
+    
+    const followUps = logs
+      .map(log => log.follow_up_at)
+      .filter(date => date)
+      .map(date => new Date(date).getTime())
+      .filter(time => !isNaN(time));
+    
+    const earliestFollowUp = followUps.length > 0 ? Math.min(...followUps) : null;
+    return { ...l, follow_up: earliestFollowUp };
+  });
 
   // Global Search
   if (APP.searchQuery) {
@@ -2215,11 +2856,37 @@ function getFilteredLeads() {
     });
   }
 
+  // Follow Up Filter
+  if (leadsFilter.followUp !== 'all') {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    
+    vl = vl.filter(l => {
+      if (!l.follow_up) return false;
+      const d = new Date(l.follow_up);
+      d.setHours(0,0,0,0);
+      
+      if (leadsFilter.followUp === 'today') return d.getTime() === today.getTime();
+      if (leadsFilter.followUp === 'tomorrow') return d.getTime() === tomorrow.getTime();
+      if (leadsFilter.followUp === 'overdue') return d.getTime() < today.getTime();
+      if (leadsFilter.followUp === 'upcoming') return d.getTime() > today.getTime();
+      return true;
+    });
+  }
+
   // Sort
   vl.sort((a, b) => {
     let va = a[leadsFilter.sort], vb = b[leadsFilter.sort];
-    if (leadsFilter.sort === 'amount_requested') return leadsFilter.dir === 'asc' ? va - vb : vb - va;
-    va = String(va); vb = String(vb);
+    
+    if (leadsFilter.sort === 'amount_requested' || leadsFilter.sort === 'follow_up') {
+      if (va === null || va === undefined) return leadsFilter.dir === 'asc' ? -1 : 1;
+      if (vb === null || vb === undefined) return leadsFilter.dir === 'asc' ? 1 : -1;
+      return leadsFilter.dir === 'asc' ? va - vb : vb - va;
+    }
+
+    va = String(va || ''); vb = String(vb || '');
     return leadsFilter.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
   });
   return vl;
@@ -2257,17 +2924,17 @@ function renderLeads() {
           ${selectedLeadIds.length > 0 ? `
             <div class="flex items-center gap-2 bg-brand-900/20 border border-brand-800/30 p-1 rounded-lg px-2 mr-2">
               <span class="text-xs text-brand-300 font-medium mr-1">Bulk Actions:</span>
-              <button class="btn btn-secondary btn-sm" onclick="exportLeadsCSV(true)"><i class="fas fa-download"></i> Export</button>
+              <button class="btn border border-[#4285F4]/30 text-[#4285F4] hover:bg-[#4285F4]/10 bg-[#4285F4]/5 transition-all rounded-md font-semibold px-3 py-1.5 text-xs flex items-center gap-1.5" onclick="exportLeadsCSV(true)"><i class="fas fa-download"></i> Export</button>
               ${canManage ? `
-                <button class="btn btn-secondary btn-sm" onclick="showBulkReassignModal()"><i class="fas fa-exchange-alt"></i> Assign</button>
+                <button class="btn border border-[#4285F4]/30 text-[#4285F4] hover:bg-[#4285F4]/10 bg-[#4285F4]/5 transition-all rounded-md font-semibold px-3 py-1.5 text-xs flex items-center gap-1.5" onclick="showBulkReassignModal()"><i class="fas fa-exchange-alt"></i> Assign</button>
                 <button class="btn btn-danger btn-sm" onclick="bulkDeleteLeads()"><i class="fas fa-trash"></i> Delete</button>
               ` : ''}
               <button class="btn-ghost btn-sm text-surface-400" onclick="selectedLeadIds=[];renderPage()">Cancel</button>
             </div>
           ` : ''}
-          <button class="btn btn-secondary btn-sm" onclick="exportLeadsCSV()"><i class="fas fa-download"></i> Export CSV</button>
-           <button class="btn btn-secondary btn-sm" onclick="downloadCSVTemplate()"><i class="fas fa-file-download"></i> Download Template</button>
-           ${canManage ? `<button class="btn btn-secondary btn-sm" onclick="openModal('importModal')"><i class="fas fa-file-import"></i> Import CSV</button>` : ''}
+          <button class="btn !bg-[#4285F4] !text-white hover:!bg-[#3367d6] hover:shadow-lg hover:shadow-[#4285F4]/20 border-none transition-all rounded-md font-semibold px-4 py-2 text-xs flex items-center gap-2" onclick="exportLeadsCSV()"><i class="fas fa-download"></i> Export CSV</button>
+          <button class="btn !bg-[#4285F4] !text-white hover:!bg-[#3367d6] hover:shadow-lg hover:shadow-[#4285F4]/20 border-none transition-all rounded-md font-semibold px-4 py-2 text-xs flex items-center gap-2" onclick="downloadCSVTemplate()"><i class="fas fa-file-download"></i> Download Template</button>
+          ${canManage ? `<button class="btn !bg-[#4285F4] !text-white hover:!bg-[#3367d6] hover:shadow-lg hover:shadow-[#4285F4]/20 border-none transition-all rounded-md font-semibold px-4 py-2 text-xs flex items-center gap-2" onclick="openModal('importModal')"><i class="fas fa-file-import"></i> Import CSV</button>` : ''}
           
         </div>
       </div>
@@ -2278,7 +2945,8 @@ function renderLeads() {
           <input type="text" class="form-input py-2 text-sm w-64" placeholder="Search name or phone..." value="${leadsFilter.search}" oninput="handleLeadsSearch(this.value)">
           
           ${renderMultiSelect('status', 'Status', [...new Set(leads.map(l => l.status || 'new'))].map(s => ({ value: s, label: STATUS_LABELS[s] || s })))}
-          ${renderMultiSelect('loanType', 'Loan Type', [...new Set(leads.map(l => l.loan_type || 'personal'))].map(s => ({ value: s, label: LOAN_LABELS[s] || s })))}
+          ${renderMultiSelect('city', 'City', [...new Set(leads.map(l => l.city || ''))].filter(c => c).map(s => ({ value: s, label: CITY_LABELS[s.toLowerCase()] || s })))}
+          ${renderMultiSelect('loanType', 'Product Type', [...new Set(leads.map(l => l.loan_type || 'personal'))].map(s => ({ value: s, label: LOAN_LABELS[s] || s })))}
           ${renderMultiSelect('source', 'Source', [...new Set(leads.map(l => l.source || 'website'))].map(s => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) })))}
           
           ${renderAssignmentFilter()}
@@ -2286,8 +2954,10 @@ function renderLeads() {
           ${canManage ? renderMultiSelect('agent', 'Agent', agents.map(a => ({ value: a.id, label: a.name }))) : ''}
           
           ${renderMultiSelect('aging', 'Aging', uniqueAgingDays.map(d => ({ value: String(d), label: `${d} Days` })))}
-
-          <button class="btn btn-ghost btn-sm" onclick="leadsFilter={status:[],loanType:[],source:[],agent:[],aging:[],assignment:'all',search:'',sort:'created_at',dir:'desc'};APP.currentPaginationPage=1;fetchLeads()"><i class="fas fa-times"></i> Clear</button>
+          
+          <button class="btn btn-ghost text-sm text-surface-400 hover:text-white transition-colors" onclick="leadsFilter={status:[],loanType:[],source:[],agent:[],aging:[],assignment:'assigned',search:'',sort:'created_at',dir:'desc',followUp:'all'};APP.currentPaginationPage=1;fetchLeads()">
+            <i class="fas fa-times"></i> Clear Filter
+          </button>
         </div>
       </div>
 
@@ -2304,12 +2974,14 @@ function renderLeads() {
                 <th class="cursor-pointer" onclick="toggleSort('name')">Name ${sortIcon('name')}</th>
                 <th>Phone</th>
                 <th>Email</th>
-                <th class="cursor-pointer" onclick="toggleSort('loan_type')">Loan Type ${sortIcon('loan_type')}</th>
+                <th class="cursor-pointer" onclick="toggleSort('lead_category')">Category ${sortIcon('lead_category')}</th>
+                <th class="cursor-pointer" onclick="toggleSort('loan_type')">Product Type ${sortIcon('loan_type')}</th>
                 <th class="cursor-pointer" onclick="toggleSort('amount_requested')">Amount ${sortIcon('amount_requested')}</th>
                 <th class="cursor-pointer" onclick="toggleSort('status')">Status ${sortIcon('status')}</th>
                 <th class="cursor-pointer" onclick="toggleSort('source')">Source ${sortIcon('source')}</th>
                 ${canManage ? '<th>Agent</th>' : ''}
                 <th>Aging</th>
+                <th class="cursor-pointer" onclick="toggleSort('follow_up')">Follow Up ${sortIcon('follow_up')}</th>
                 <th class="cursor-pointer" onclick="toggleSort('assigned_at')">Assigned Date ${sortIcon('assigned_at')}</th>
                 <th class="cursor-pointer" onclick="toggleSort('created_at')">Created ${sortIcon('created_at')}</th>
                 <th>Docs</th>
@@ -2317,7 +2989,7 @@ function renderLeads() {
               </tr>
             </thead>
             <tbody id="leadsTableBody">
-              ${paginatedLeads.length === 0 ? `<tr><td colspan="${canManage?14:13}" class="text-center py-12 text-surface-500">No leads found</td></tr>` :
+              ${paginatedLeads.length === 0 ? `<tr><td colspan="${canManage?16:15}" class="text-center py-12 text-surface-500">No leads found</td></tr>` :
               paginatedLeads.map(l => renderLeadRow(l, canManage)).join('')}
             </tbody>
           </table>
@@ -2349,12 +3021,14 @@ function renderLeadRow(l, canManage) {
         ${getPriorityDot(l.priority)}
         <div>
           <p class="font-medium text-white">${l.name}</p>
+          <p class="text-[10px] font-mono text-surface-400 mb-0.5">${l.lead_uid || ''}</p>
           <p class="text-xs text-surface-500">${l.city}</p>
         </div>
       </div>
     </td>
     <td class="font-mono text-sm">${l.phone}</td>
     <td class="text-sm text-surface-400 max-w-[150px] truncate" title="${l.email || ''}">${l.email || '—'}</td>
+    <td class="text-sm text-surface-400">${CATEGORY_LABELS[l.lead_category] || l.lead_category || 'Individual'}</td>
     <td><span class="text-sm">${LOAN_LABELS[l.loan_type] || l.loan_type}</span></td>
     <td class="font-medium text-white">${formatCurrency(l.amount_requested)}</td>
     <td><span class="${getStatusBadgeClass(l.status || 'new')}">${STATUS_LABELS[l.status] || l.status || '—'}</span></td>
@@ -2362,6 +3036,20 @@ function renderLeadRow(l, canManage) {
     ${canManage ? `<td class="text-sm text-surface-400">${getUser(l.assigned_agent_id)?.name || 'Unassigned'}</td>` : ''}
     <td class="text-sm">
       <span class="text-surface-400">${getAging(l.assigned_at)}</span>
+    </td>
+    <td class="text-sm">
+      ${(() => {
+        const calls = getLeadCalls(l.id || l._id);
+        const hasFollowUps = calls.some(c => c.follow_up_at && c.follow_up_status !== 'done');
+        if (hasFollowUps) {
+          return `
+            <button class="text-brand-400 hover:text-brand-300 font-medium flex items-center gap-1 transition-colors" onclick="navigateToLeadFollowUps('${l.id || l._id}')">
+              <i class="fas fa-calendar-check text-xs"></i> View
+            </button>
+          `;
+        }
+        return '<span class="text-surface-600">—</span>';
+      })()}
     </td>
     <td class="text-sm text-surface-400">${formatDate(l.assigned_at)}</td>
     <td class="text-sm text-surface-400">${formatDate(l.created_at)}</td>
@@ -2506,6 +3194,579 @@ function renderPipeline() {
   `;
 }
 
+// ========== FOLLOW UPS PAGE ==========
+function getAllFollowUps() {
+  const visibleLeads = getVisibleLeads();
+  const visibleLeadIds = new Set(visibleLeads.map(l => l.id || l._id));
+  
+  let logs = callLogs.filter(c => c.follow_up_at && visibleLeadIds.has(typeof c.lead_id === 'object' ? (c.lead_id._id || c.lead_id.id) : c.lead_id));
+  
+  if (APP.followUpLeadFilter) {
+    logs = logs.filter(c => {
+      const leadId = typeof c.lead_id === 'object' ? (c.lead_id._id || c.lead_id.id) : c.lead_id;
+      return leadId === APP.followUpLeadFilter;
+    });
+  }
+
+  // Apply Follow Up Filters
+  const f = APP.followUpFilters;
+  const now = new Date();
+
+  return logs
+    .map(c => {
+      const leadId = typeof c.lead_id === 'object' ? (c.lead_id._id || c.lead_id.id) : c.lead_id;
+      const lead = leads.find(l => (l.id || l._id) === leadId);
+      return { 
+        ...c, 
+        leadName: lead ? lead.name : 'Unknown Lead', 
+        leadPhone: lead ? lead.phone : '',
+        leadStatus: lead ? lead.status : 'unknown',
+        leadPriority: lead ? lead.priority : 'cold',
+        outcome: c.outcome || '—'
+      };
+    })
+    .filter(item => {
+      // Search filter (name, phone)
+      if (f.search) {
+        const search = f.search.toLowerCase();
+        if (!item.leadName.toLowerCase().includes(search) && !item.leadPhone.includes(search)) return false;
+      }
+      
+      // Status filter
+      if (f.status !== 'all' && item.leadStatus !== f.status) return false;
+      
+      // Priority filter
+      if (f.priority !== 'all' && item.leadPriority !== f.priority) return false;
+      
+      // Outcome filter
+      if (f.outcome !== 'all' && item.outcome !== f.outcome) return false;
+      
+      // Follow Up Status filter
+      if (f.followUpStatus !== 'all' && item.follow_up_status !== f.followUpStatus) return false;
+      
+      // Timeline filter
+      if (f.timeline !== 'all') {
+        const d = new Date(item.follow_up_at);
+        if (f.timeline === 'today') {
+          if (!isTodayIST(item.follow_up_at)) return false;
+        } else if (f.timeline === 'overdue') {
+          if (d >= now || item.follow_up_status === 'done') return false;
+        } else if (f.timeline === 'upcoming') {
+          if (d < now) return false;
+        }
+      }
+      
+      return true;
+    })
+    .sort((a, b) => new Date(a.follow_up_at) - new Date(b.follow_up_at));
+}
+
+function clearFollowUpFilters() {
+  APP.followUpFilters = {
+    search: '',
+    status: 'all',
+    priority: 'all',
+    outcome: 'all',
+    followUpStatus: 'all',
+    timeline: 'all'
+  };
+  APP.followUpLeadFilter = null;
+  renderPage();
+}
+
+function renderFollowUps() {
+  const followUps = getAllFollowUps();
+  const leadName = APP.followUpLeadFilter ? (leads.find(l => (l.id || l._id) === APP.followUpLeadFilter)?.name || 'Lead') : null;
+  
+  return `
+    <div class="fade-in">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="font-display font-bold text-2xl text-white">Follow Ups ${leadName ? `<span class="text-brand-400">for ${leadName}</span>` : ''}</h2>
+          <div class="flex items-center gap-3 mt-1">
+            <p class="text-surface-400 text-sm">${followUps.length} scheduled follow ups</p>
+            ${APP.followUpLeadFilter ? `
+              <button class="text-[10px] font-bold text-rose-400 hover:text-rose-300 uppercase tracking-wider bg-rose-400/10 px-2 py-0.5 rounded flex items-center gap-1 transition-colors" onclick="APP.followUpLeadFilter = null; renderPage()">
+                <i class="fas fa-times-circle"></i> Clear Filter
+              </button>
+            ` : ''}
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 bg-surface-800 p-1 rounded-lg">
+          <div class="flex items-center gap-1 border-r border-surface-700 pr-2 mr-1">
+            <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${APP.currentFollowUpView === 'calendar' ? 'bg-[#4285F4] text-white shadow-lg shadow-[#4285F4]/20' : 'text-surface-400 hover:text-[#4285F4] hover:bg-[#4285F4]/10'}" onclick="APP.currentFollowUpView='calendar'; renderPage()">
+              <i class="fas fa-calendar-alt mr-2"></i>Calendar
+            </button>
+            <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${APP.currentFollowUpView === 'cards' ? 'bg-[#4285F4] text-white shadow-lg shadow-[#4285F4]/20' : 'text-surface-400 hover:text-[#4285F4] hover:bg-[#4285F4]/10'}" onclick="APP.currentFollowUpView='cards'; renderPage()">
+              <i class="fas fa-th-large mr-2"></i>Cards
+            </button>
+            <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${APP.currentFollowUpView === 'table' ? 'bg-[#4285F4] text-white shadow-lg shadow-[#4285F4]/20' : 'text-surface-400 hover:text-[#4285F4] hover:bg-[#4285F4]/10'}" onclick="APP.currentFollowUpView='table'; renderPage()">
+              <i class="fas fa-list mr-2"></i>Table
+            </button>
+          </div>
+          ${APP.currentFollowUpView === 'calendar' ? `
+            <div class="flex items-center gap-1">
+              <button class="px-3 py-1.5 text-[11px] font-bold rounded-md transition-colors ${APP.followUpCalendarView === 'month' ? 'text-[#4285F4] bg-[#4285F4]/20 font-bold' : 'text-surface-400 hover:text-[#4285F4] hover:bg-[#4285F4]/10'}" onclick="APP.followUpCalendarView='month'; renderPage()">MONTH</button>
+              <button class="px-3 py-1.5 text-[11px] font-bold rounded-md transition-colors ${APP.followUpCalendarView === 'week' ? 'text-[#4285F4] bg-[#4285F4]/20 font-bold' : 'text-surface-400 hover:text-[#4285F4] hover:bg-[#4285F4]/10'}" onclick="APP.followUpCalendarView='week'; renderPage()">WEEK</button>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3 mb-6 bg-surface-900/50 p-4 rounded-xl border border-surface-800">
+        <div class="relative flex-1 min-w-[200px]">
+          <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-surface-500 text-sm"></i>
+          <input 
+            type="text" 
+            placeholder="Search lead or mobile..." 
+            class="w-full bg-surface-800 border-none rounded-lg py-2 pl-10 pr-4 text-sm text-white focus:ring-1 focus:ring-brand-500 placeholder:text-surface-600"
+            value="${APP.followUpFilters.search}"
+            oninput="APP.followUpFilters.search = this.value; renderPage()"
+          >
+        </div>
+        
+        <div class="flex flex-wrap items-center gap-2">
+          <select class="bg-surface-800 border-none rounded-lg py-2 px-3 text-xs text-surface-300 focus:ring-1 focus:ring-brand-500" onchange="APP.followUpFilters.status = this.value; renderPage()">
+            <option value="all" ${APP.followUpFilters.status === 'all' ? 'selected' : ''}>All Status</option>
+            ${Object.entries(STATUS_LABELS).map(([val, label]) => `<option value="${val}" ${APP.followUpFilters.status === val ? 'selected' : ''}>${label}</option>`).join('')}
+          </select>
+
+          <select class="bg-surface-800 border-none rounded-lg py-2 px-3 text-xs text-surface-300 focus:ring-1 focus:ring-brand-500" onchange="APP.followUpFilters.priority = this.value; renderPage()">
+            <option value="all" ${APP.followUpFilters.priority === 'all' ? 'selected' : ''}>All Priority</option>
+            ${Object.entries(PRIORITY_LABELS).map(([val, label]) => `<option value="${val}" ${APP.followUpFilters.priority === val ? 'selected' : ''}>${label}</option>`).join('')}
+          </select>
+
+          <select class="bg-surface-800 border-none rounded-lg py-2 px-3 text-xs text-surface-300 focus:ring-1 focus:ring-brand-500" onchange="APP.followUpFilters.outcome = this.value; renderPage()">
+            <option value="all" ${APP.followUpFilters.outcome === 'all' ? 'selected' : ''}>All Outcomes</option>
+            ${Object.entries(OUTCOME_LABELS).map(([val, label]) => `<option value="${val}" ${APP.followUpFilters.outcome === val ? 'selected' : ''}>${label}</option>`).join('')}
+          </select>
+
+          <select class="bg-surface-800 border-none rounded-lg py-2 px-3 text-xs text-surface-300 focus:ring-1 focus:ring-brand-500" onchange="APP.followUpFilters.followUpStatus = this.value; renderPage()">
+            <option value="all" ${APP.followUpFilters.followUpStatus === 'all' ? 'selected' : ''}>All F/U Status</option>
+            <option value="pending" ${APP.followUpFilters.followUpStatus === 'pending' ? 'selected' : ''}>Pending</option>
+            <option value="done" ${APP.followUpFilters.followUpStatus === 'done' ? 'selected' : ''}>Done</option>
+          </select>
+
+          <select class="bg-surface-800 border-none rounded-lg py-2 px-3 text-xs text-surface-300 focus:ring-1 focus:ring-brand-500" onchange="APP.followUpFilters.timeline = this.value; renderPage()">
+            <option value="all" ${APP.followUpFilters.timeline === 'all' ? 'selected' : ''}>All Timeline</option>
+            <option value="today" ${APP.followUpFilters.timeline === 'today' ? 'selected' : ''}>Today</option>
+            <option value="overdue" ${APP.followUpFilters.timeline === 'overdue' ? 'selected' : ''}>Overdue</option>
+            <option value="upcoming" ${APP.followUpFilters.timeline === 'upcoming' ? 'selected' : ''}>Upcoming</option>
+          </select>
+
+          <button onclick="exportFollowUpsCSV()" class="bg-[#4285F4] hover:bg-[#3367d6] text-white hover:shadow-lg hover:shadow-[#4285F4]/20 px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border-none">
+            <i class="fas fa-file-csv"></i> Export CSV
+          </button>
+          
+          <button onclick="clearFollowUpFilters()" class="btn btn-ghost text-sm text-surface-400 hover:text-white transition-colors">
+            <i class="fas fa-times"></i> Clear Filter
+          </button>
+        </div>
+      </div>
+
+      <div class="min-h-[600px]">
+        ${APP.currentFollowUpView === 'calendar' ? (APP.followUpCalendarView === 'month' ? renderFollowUpCalendar(followUps) : renderFollowUpWeeklyCalendar(followUps)) : 
+          APP.currentFollowUpView === 'cards' ? renderFollowUpCards(followUps) : 
+          renderFollowUpTable(followUps)}
+      </div>
+    </div>
+  `;
+}
+
+function renderFollowUpCalendar(followUps) {
+  const date = APP.followUpCalendarDate;
+  const month = date.getMonth();
+  const year = date.getFullYear();
+  
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthName = date.toLocaleString('en-IN', { month: 'long', timeZone: 'Asia/Kolkata' });
+  
+  const prevMonth = () => { APP.followUpCalendarDate.setMonth(month - 1); renderPage(); };
+  const nextMonth = () => { APP.followUpCalendarDate.setMonth(month + 1); renderPage(); };
+
+  const days = [];
+  for (let i = 0; i < firstDay; i++) days.push(null);
+  for (let i = 1; i <= daysInMonth; i++) days.push(i);
+
+  return `
+    <div class="card overflow-hidden border border-surface-800">
+      <div class="flex items-center justify-between p-4 bg-surface-900/50 border-b border-surface-800">
+        <h3 class="font-display font-bold text-white text-lg flex items-center gap-2">
+          <i class="far fa-calendar-alt text-brand-400"></i>
+          <span>${monthName} ${year}</span>
+        </h3>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-ghost btn-sm" onclick="APP.followUpCalendarDate.setMonth(${month - 1}); renderPage()"><i class="fas fa-chevron-left text-surface-400 hover:text-white"></i></button>
+          <button class="btn btn-secondary btn-sm px-3" onclick="APP.followUpCalendarDate = new Date(); renderPage()">Today</button>
+          <button class="btn btn-ghost btn-sm" onclick="APP.followUpCalendarDate.setMonth(${month + 1}); renderPage()"><i class="fas fa-chevron-right text-surface-400 hover:text-white"></i></button>
+        </div>
+      </div>
+      <div class="grid grid-cols-7 border-b border-surface-800 bg-surface-900/30">
+        ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => `<div class="p-3 text-center text-[10px] font-bold text-surface-400 uppercase tracking-widest border-r border-surface-800/40 last:border-0">${d}</div>`).join('')}
+      </div>
+      <div class="grid grid-cols-7 auto-rows-[130px] bg-surface-950/20">
+        ${days.map((d, i) => {
+          if (d === null) return `<div class="border-r border-b border-surface-800/60 bg-surface-900/10 last:border-r-0"></div>`;
+          
+          const currentDayDate = new Date(year, month, d);
+          const dayFollowUps = followUps.filter(f => isSameDayIST(f.follow_up_at, currentDayDate));
+          const isToday = isTodayIST(currentDayDate);
+          const isWeekend = i % 7 === 0 || i % 7 === 6;
+          
+          return `
+            <div class="border-r border-b border-surface-800/60 p-2.5 relative group hover:bg-surface-800/20 transition-colors flex flex-col justify-between ${isWeekend ? 'bg-surface-900/5' : ''} last:border-r-0">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-semibold ${isToday ? 'bg-brand-500 text-black font-bold w-6 h-6 flex items-center justify-center rounded-full shadow-md shadow-brand-500/20' : 'text-surface-400'}">${d}</span>
+                ${dayFollowUps.length > 0 ? `<span class="text-[9px] text-brand-300 bg-brand-500/10 border border-brand-500/20 px-1.5 py-0.5 rounded-full font-bold">${dayFollowUps.length} F/U</span>` : ''}
+              </div>
+              <div class="mt-1 space-y-1 overflow-y-auto flex-1 max-h-[85px] scrollbar-thin scrollbar-thumb-surface-700">
+                ${dayFollowUps.map(f => {
+                  const isDone = f.follow_up_status === 'done';
+                  return `
+                    <div class="text-[10px] p-1.5 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${isDone ? 'bg-emerald-600/5 border-emerald-600/10 text-emerald-400/50 line-through hover:bg-emerald-600/10' : 'bg-amber-600/10 border-amber-600/20 text-amber-400 hover:bg-amber-600/20'}" onclick="showLeadDetail('${f.lead_id}')" title="${f.leadName} (${f.follow_up_status})">
+                      <i class="far ${isDone ? 'fa-check-circle text-emerald-400' : 'fa-clock text-amber-400'} flex-shrink-0 text-[10px]"></i>
+                      <span class="font-semibold flex-shrink-0">${new Date(f.follow_up_at).toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit', hour12: true, timeZone: 'Asia/Kolkata'})}</span> 
+                      <span class="truncate font-medium">${f.leadName}</span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderFollowUpWeeklyCalendar(followUps) {
+  const date = new Date(APP.followUpCalendarDate);
+  const day = date.getDay(); // 0 is Sunday
+  const diff = date.getDate() - day; // Adjust to start on Sunday
+  const weekStart = new Date(date.setDate(diff));
+  
+  const weekDays = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    weekDays.push(d);
+  }
+
+  const startStr = weekDays[0].toLocaleDateString('en-IN', { month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' });
+  const endStr = weekDays[6].toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Kolkata' });
+
+  return `
+    <div class="card overflow-hidden">
+      <div class="flex items-center justify-between p-4 border-b border-surface-800">
+        <h3 class="font-display font-bold text-white text-lg">${startStr} - ${endStr}</h3>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-ghost btn-sm" onclick="const d = new Date(APP.followUpCalendarDate); d.setDate(d.getDate() - 7); APP.followUpCalendarDate = d; renderPage()"><i class="fas fa-chevron-left"></i></button>
+          <button class="btn btn-ghost btn-sm" onclick="APP.followUpCalendarDate = new Date(); renderPage()">Today</button>
+          <button class="btn btn-ghost btn-sm" onclick="const d = new Date(APP.followUpCalendarDate); d.setDate(d.getDate() + 7); APP.followUpCalendarDate = d; renderPage()"><i class="fas fa-chevron-right"></i></button>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-7 min-h-[500px]">
+        ${weekDays.map(d => {
+          const isToday = isTodayIST(d);
+          const dayFollowUps = followUps.filter(f => isSameDayIST(f.follow_up_at, d));
+          
+          return `
+            <div class="border-r border-b border-surface-800 p-4 flex flex-col group hover:bg-surface-800/10 transition-colors last:border-r-0">
+              <div class="flex flex-col items-center mb-4">
+                <span class="text-[10px] font-bold text-surface-500 uppercase tracking-widest mb-1">${d.toLocaleDateString('en-IN', { weekday: 'short', timeZone: 'Asia/Kolkata' })}</span>
+                <span class="text-lg font-bold ${isToday ? 'bg-brand-600 text-white w-10 h-10 flex items-center justify-center rounded-full' : 'text-white'}">${d.getDate()}</span>
+              </div>
+              <div class="flex-1 space-y-3 overflow-y-auto max-h-[400px] custom-scrollbar pr-1">
+                ${dayFollowUps.length === 0 ? `
+                  <div class="flex flex-col items-center justify-center h-20 border border-dashed border-surface-800 rounded-lg opacity-20">
+                    <i class="fas fa-calendar-plus text-xs mb-1"></i>
+                    <span class="text-[10px]">Free</span>
+                  </div>
+                ` : dayFollowUps.map(f => {
+                  const isDone = f.follow_up_status === 'done';
+                  return `
+                    <div class="p-3 rounded-lg ${isDone ? 'bg-emerald-600/5 border-emerald-600/10 opacity-60' : 'bg-amber-600/10 border-amber-600/20 hover:bg-amber-600/20'} border transition-all cursor-pointer group/item" onclick="showLeadDetail('${f.lead_id}')">
+                      <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] font-bold ${isDone ? 'text-emerald-400' : 'text-amber-400'}">
+                          ${isDone ? '<i class="fas fa-check-circle mr-1"></i>DONE' : new Date(f.follow_up_at).toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit', timeZone: 'Asia/Kolkata'})}
+                        </span>
+                        <i class="fas fa-external-link-alt text-[8px] text-surface-500 opacity-0 group-hover/item:opacity-100"></i>
+                      </div>
+                      <p class="text-xs font-bold text-white truncate mb-1 ${isDone ? 'line-through text-surface-500' : ''}">${f.leadName}</p>
+                      <p class="text-[10px] text-surface-400 line-clamp-2 italic">${f.notes ? `"${f.notes}"` : ' - '}</p>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderFollowUpCards(followUps) {
+  if (followUps.length === 0) return `<div class="text-center py-20 text-surface-500">No follow ups scheduled</div>`;
+  
+  return `
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      ${followUps.map(f => {
+        const date = new Date(f.follow_up_at);
+        const isDone = f.follow_up_status === 'done';
+        const isToday = isTodayIST(f.follow_up_at) && !isDone;
+        const isOverdue = date < new Date() && !isToday && !isDone;
+        
+        return `
+          <div class="card p-4 hover:border-brand-500/30 transition-all cursor-pointer group ${isDone ? 'opacity-70' : ''}" onclick="showLeadDetail('${f.lead_id}')">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-[10px] font-bold uppercase tracking-wider ${isDone ? 'text-emerald-400 bg-emerald-400/10' : isOverdue ? 'text-rose-400 bg-rose-400/10' : isToday ? 'text-amber-400 bg-amber-400/10' : 'text-emerald-400 bg-emerald-400/10'} px-2 py-0.5 rounded">
+                ${isDone ? 'Completed' : isOverdue ? 'Overdue' : isToday ? 'Today' : 'Upcoming'}
+              </span>
+              <span class="text-[10px] text-surface-500">${formatDateTime(f.created_at)}</span>
+            </div>
+            <h4 class="text-white font-bold mb-1 ${isDone ? 'line-through text-surface-400' : ''}">${f.leadName}</h4>
+            <p class="text-xs text-surface-400 mb-3"><i class="fas fa-phone-alt mr-1"></i>${f.leadPhone}</p>
+            
+            <div class="bg-surface-800/50 rounded-lg p-3 border border-surface-700/50 mb-3">
+              <div class="flex items-center gap-2 ${isDone ? 'text-emerald-400' : 'text-amber-400'} text-xs font-bold mb-1">
+                <i class="fas ${isDone ? 'fa-check-circle' : 'fa-calendar-check'}"></i>
+                <span>${formatDateTime(f.follow_up_at)}</span>
+              </div>
+              <p class="text-[11px] text-surface-300 italic">${f.notes ? `"${f.notes}"` : ' - '}</p>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 mt-4">
+              <button class="btn btn-ghost btn-sm text-[10px] h-7 ${isDone ? 'text-emerald-400' : 'text-surface-400'}" onclick="event.stopPropagation(); toggleFollowUpStatus('${f.id || f._id}', '${isDone ? 'pending' : 'done'}')">
+                <i class="fas ${isDone ? 'fa-check-circle' : 'fa-circle'} mr-1"></i>${isDone ? 'Done' : 'Mark Done'}
+              </button>
+              <button class="btn btn-primary btn-sm text-[10px] h-7" onclick="event.stopPropagation(); showLeadDetail('${f.lead_id}')">
+                View Lead
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderFollowUpTable(followUps) {
+  if (followUps.length === 0) return `<div class="text-center py-20 text-surface-500">No follow ups scheduled</div>`;
+
+  return `
+    <div class="card overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-surface-800/50 text-[11px] font-bold text-surface-400 uppercase tracking-wider border-b border-surface-800">
+              <th class="py-4 px-6">Lead</th>
+              <th class="py-4 px-6">Status</th>
+              <th class="py-4 px-6">Priority</th>
+              <th class="py-4 px-6">Call Output</th>
+              <th class="py-4 px-6">Notes</th>
+              <th class="py-4 px-6">Follow Up Time</th>
+              <th class="py-4 px-6">Follow Up Status</th>
+              <th class="py-4 px-6">Timeline</th>
+              <th class="py-4 px-6 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-surface-800">
+            ${followUps.map(f => {
+              const date = new Date(f.follow_up_at);
+              const isDone = f.follow_up_status === 'done';
+              const isToday = isTodayIST(f.follow_up_at) && !isDone;
+              const isOverdue = date < new Date() && !isToday && !isDone;
+              
+              return `
+                <tr class="hover:bg-surface-800/30 transition-colors ${isDone ? 'opacity-60' : ''}">
+                  <td class="py-4 px-6">
+                    <div class="flex flex-col">
+                      <span class="text-sm font-bold text-white group-hover/item:text-brand-400 transition-colors">${f.leadName}</span>
+                      <span class="text-[11px] text-surface-500">${f.leadPhone}</span>
+                    </div>
+                  </td>
+                  <td class="py-4 px-6">
+                    <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded border border-surface-700 bg-surface-800 text-surface-300">
+                      ${STATUS_LABELS[f.leadStatus] || f.leadStatus}
+                    </span>
+                  </td>
+                  <td class="py-4 px-6">
+                    <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded border ${
+                      f.leadPriority === 'hot' ? 'border-rose-500/50 bg-rose-500/10 text-rose-400' :
+                      f.leadPriority === 'warm' ? 'border-amber-500/50 bg-amber-500/10 text-amber-400' :
+                      'border-surface-700 bg-surface-800 text-surface-400'
+                    }">
+                      ${PRIORITY_LABELS[f.leadPriority] || f.leadPriority}
+                    </span>
+                  </td>
+                  <td class="py-4 px-6">
+                    <span class="text-xs text-surface-300">${OUTCOME_LABELS[f.outcome] || f.outcome}</span>
+                  </td>
+                  <td class="py-4 px-6 max-w-xs">
+                    <p class="text-[11px] text-surface-300 italic line-clamp-2" title="${f.notes || ' - '}">${f.notes ? `"${f.notes}"` : ' - '}</p>
+                  </td>
+                  <td class="py-4 px-6">
+                    <div class="flex flex-col">
+                      <span class="text-sm font-medium ${isDone ? 'text-surface-500' : isOverdue ? 'text-rose-400' : isToday ? 'text-amber-400' : 'text-emerald-400'}">${formatDateTime(f.follow_up_at)}</span>
+                    </div>
+                  </td>
+                  <td class="py-4 px-6">
+                    <button class="flex items-center gap-2 text-xs font-medium ${isDone ? 'text-emerald-400' : 'text-surface-400'} hover:opacity-80 transition-all" onclick="toggleFollowUpStatus('${f.id || f._id}', '${isDone ? 'pending' : 'done'}')">
+                      <i class="fas ${isDone ? 'fa-check-circle' : 'fa-circle'} text-sm"></i>
+                      ${isDone ? 'Done' : 'Mark as Done'}
+                    </button>
+                  </td>
+                  <td class="py-4 px-6">
+                    <span class="text-[10px] font-bold uppercase tracking-wider ${isDone ? 'text-emerald-400 bg-emerald-400/10' : isOverdue ? 'text-rose-400 bg-rose-400/10' : isToday ? 'text-amber-400 bg-amber-400/10' : 'text-emerald-400 bg-emerald-400/10'} px-2 py-0.5 rounded">
+                      ${isDone ? 'Completed' : isOverdue ? 'Overdue' : isToday ? 'Today' : 'Upcoming'}
+                    </span>
+                  </td>
+                  <td class="py-4 px-6 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                      <button class="p-2 text-surface-400 hover:text-white transition-colors" onclick="showLeadDetail('${f.lead_id}')" title="View Lead">
+                        <i class="fas fa-external-link-alt"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function showAddFollowUpNoteModal(logId) {
+  const log = callLogs.find(c => (c.id || c._id) === logId);
+  if (!log) return;
+  
+  const leadId = typeof log.lead_id === 'object' ? (log.lead_id._id || log.lead_id.id) : log.lead_id;
+  const lead = leads.find(l => (l.id || l._id) === leadId);
+  
+  const modal = `
+    <div class="modal-overlay show" id="followUpNoteModal" onclick="closeModal('followUpNoteModal')">
+      <div class="modal-content w-full max-w-md p-6 fade-in" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h3 class="text-xl font-display font-bold text-white">Update Notes</h3>
+            <p class="text-sm text-surface-400">For follow up with ${lead ? lead.name : 'Unknown'}</p>
+          </div>
+          <button class="text-surface-400 hover:text-white" onclick="closeModal('followUpNoteModal')">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-surface-400 mb-1.5">Follow up Date & Time</label>
+            <div class="p-3 bg-surface-800/50 rounded-lg border border-surface-700 text-sm text-amber-400 font-medium">
+              <i class="fas fa-calendar-check mr-2"></i> ${formatDateTime(log.follow_up_at)}
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-surface-400 mb-1.5">Follow up Notes</label>
+            <textarea id="followUpNotesInput" class="form-input min-h-[120px] resize-none" placeholder="Add details about this follow up...">${log.notes || ''}</textarea>
+          </div>
+          <div class="flex justify-end gap-3 pt-4">
+            <button class="btn btn-ghost" onclick="closeModal('followUpNoteModal')">Cancel</button>
+            <button class="btn btn-primary px-8" id="saveFollowUpNoteBtn" onclick="saveFollowUpNote('${logId}')">Save Notes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', modal);
+}
+
+async function saveFollowUpNote(logId) {
+  const btn = document.getElementById('saveFollowUpNoteBtn');
+  const notes = document.getElementById('followUpNotesInput').value;
+  
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+  
+  try {
+    const log = callLogs.find(c => (c.id || c._id) === logId);
+    if (!log) throw new Error('Log not found');
+    
+    const updatedLog = await fetchAPI('/calls/' + logId, {
+      method: 'PUT',
+      body: JSON.stringify({ notes })
+    });
+    
+    if (!updatedLog) return;
+    
+    const idx = callLogs.findIndex(c => (c.id || c._id) === logId);
+    if (idx !== -1) callLogs[idx] = updatedLog;
+    
+    toast('Follow up notes updated successfully', 'success');
+    closeModal('followUpNoteModal');
+    renderPage();
+  } catch (err) {
+    console.error(err);
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Save Notes';
+  }
+}
+
+async function toggleFollowUpStatus(logId, newStatus) {
+  if (newStatus === 'done') {
+    const confirmed = await showConfirmModalAsync('Mark Follow Up as Done?', 'Are you sure you want to mark this follow up as completed?');
+    if (!confirmed) return;
+  } else if (newStatus === 'pending') {
+    const confirmed = await showConfirmModalAsync('Unmark Follow Up?', 'Are you sure you want to mark this follow up as pending again?');
+    if (!confirmed) return;
+  }
+  try {
+    const updatedLog = await fetchAPI('/calls/' + logId, {
+      method: 'PUT',
+      body: JSON.stringify({ follow_up_status: newStatus })
+    });
+    
+    if (!updatedLog) return;
+    
+    const idx = callLogs.findIndex(c => (c.id || c._id) === logId);
+    if (idx !== -1) callLogs[idx] = updatedLog;
+    
+    toast(`Follow up marked as ${newStatus}`, 'success');
+    renderPage();
+  } catch (err) {
+    console.error(err);
+    toast(err.message, 'error');
+  }
+}
+
+function showConfirmModalAsync(title, message) {
+  return new Promise((resolve) => {
+    const modalId = 'confirmModal_' + Date.now();
+    window[modalId + '_resolve'] = (val) => {
+      document.getElementById(modalId).remove();
+      delete window[modalId + '_resolve'];
+      resolve(val);
+    };
+    const modal = `
+      <div class="modal-overlay show" id="${modalId}" onclick="window['${modalId}_resolve'](false)">
+        <div class="modal-content w-full max-w-sm p-6 fade-in" onclick="event.stopPropagation()">
+          <h3 class="text-xl font-display font-bold text-white mb-2">${title}</h3>
+          <p class="text-surface-400 text-sm mb-6">${message}</p>
+          <div class="flex justify-end gap-3">
+            <button class="btn btn-ghost" onclick="window['${modalId}_resolve'](false)">Cancel</button>
+            <button class="btn btn-primary px-6" onclick="window['${modalId}_resolve'](true)">Confirm</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modal);
+  });
+}
+
 // ========== CALLING QUEUE ==========
 function renderCallingQueue() {
   let vl = getVisibleLeads().filter(l => !['disbursed','rejected','dead','not_interested'].includes(l.status));
@@ -2516,12 +3777,8 @@ function renderCallingQueue() {
     vl = vl.filter(l => !l.assigned_agent_id);
   }
 
-  // Sort: follow-ups today first, then hot, then new, then others
+  // Sort: hot first, then new, then others
   vl.sort((a, b) => {
-    const aFollowup = getLeadCalls(a.id).some(c => c.follow_up_at && new Date(c.follow_up_at).toDateString() === new Date().toDateString());
-    const bFollowup = getLeadCalls(b.id).some(c => c.follow_up_at && new Date(c.follow_up_at).toDateString() === new Date().toDateString());
-    if (aFollowup && !bFollowup) return -1;
-    if (!aFollowup && bFollowup) return 1;
     const pOrder = { hot: 0, warm: 1, cold: 2 };
     if (pOrder[a.priority] !== pOrder[b.priority]) return pOrder[a.priority] - pOrder[b.priority];
     const sOrder = { new: 0, contacted: 1, interested: 2, documents_pending: 3, login_done: 4 };
@@ -2538,10 +3795,10 @@ function renderCallingQueue() {
       </div>
       <div class="space-y-3">
         ${vl.map((l, i) => {
-          const lastCall = getLeadCalls(l.id)[0];
-          const hasFollowupToday = lastCall?.follow_up_at && new Date(lastCall.follow_up_at).toDateString() === new Date().toDateString();
+          const calls = getLeadCalls(l.id);
+          const lastCall = calls[0];
           return `
-            <div class="card flex flex-col sm:flex-row items-start sm:items-center gap-4 ${hasFollowupToday ? 'glow-emerald border-amber-600/30' : ''}">
+            <div class="card flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div class="flex items-center gap-4 flex-1 min-w-0">
                 <div class="w-10 h-10 rounded-full ${l.priority === 'hot' ? 'bg-rose-600/20' : l.priority === 'warm' ? 'bg-amber-600/20' : 'bg-surface-800'} flex items-center justify-center flex-shrink-0">
                   <span class="text-sm font-bold ${l.priority === 'hot' ? 'text-rose-400' : l.priority === 'warm' ? 'text-amber-400' : 'text-surface-400'}">${i + 1}</span>
@@ -2550,7 +3807,6 @@ function renderCallingQueue() {
                   <div class="flex items-center gap-2 flex-wrap">
                     <p class="font-semibold text-white">${l.name}</p>
                     ${l.priority === 'hot' ? '<span class="badge badge-hot">HOT</span>' : ''}
-                    ${hasFollowupToday ? '<span class="badge badge-documents-pending">Follow-up Due</span>' : ''}
                   </div>
                   <p class="text-sm text-surface-400 mt-0.5">${l.phone}${l.email ? ` — ${l.email}` : ''} — ${l.city}</p>
                   <p class="text-xs text-surface-500 mt-0.5">${LOAN_LABELS[l.loan_type] || l.loan_type} — ${formatCurrency(l.amount_requested)} — ${lastCall ? 'Last call: ' + timeAgo(lastCall.created_at) : 'No calls yet'}</p>
@@ -2715,15 +3971,15 @@ function renderTeam() {
         </div>
         <div class="flex items-center gap-3">
           <div class="hidden sm:flex bg-surface-900 border border-surface-800 rounded-lg p-1 text-xs gap-1">
-            <button onclick="filterTeamRole('all', event)" class="px-2.5 py-1 rounded transition-colors ${filterRole === 'all' ? 'bg-brand-600/20 text-brand-400 font-semibold' : 'text-surface-400 hover:text-white'}">All</button>
-            <button onclick="filterTeamRole('tl', event)" class="px-2.5 py-1 rounded transition-colors ${filterRole === 'tl' ? 'bg-brand-600/20 text-brand-400 font-semibold' : 'text-surface-400 hover:text-white'}">Leaders</button>
-            <button onclick="filterTeamRole('agent', event)" class="px-2.5 py-1 rounded transition-colors ${filterRole === 'agent' ? 'bg-brand-600/20 text-brand-400 font-semibold' : 'text-surface-400 hover:text-white'}">Agents</button>
+            <button id="team-role-filter-all" onclick="filterTeamRole('all', event)" class="px-2.5 py-1 rounded transition-colors ${filterRole === 'all' ? 'bg-[#4285F4]/20 text-[#4285F4] font-semibold' : 'text-surface-400 hover:text-[#4285F4] hover:bg-[#4285F4]/10'}">All</button>
+            <button id="team-role-filter-tl" onclick="filterTeamRole('tl', event)" class="px-2.5 py-1 rounded transition-colors ${filterRole === 'tl' ? 'bg-[#4285F4]/20 text-[#4285F4] font-semibold' : 'text-surface-400 hover:text-[#4285F4] hover:bg-[#4285F4]/10'}">Leaders</button>
+            <button id="team-role-filter-agent" onclick="filterTeamRole('agent', event)" class="px-2.5 py-1 rounded transition-colors ${filterRole === 'agent' ? 'bg-[#4285F4]/20 text-[#4285F4] font-semibold' : 'text-surface-400 hover:text-[#4285F4] hover:bg-[#4285F4]/10'}">Agents</button>
           </div>
           <div class="hidden sm:flex bg-surface-900 border border-surface-800 rounded-lg p-1 text-xs gap-1">
-            <button onclick="setTeamView('gallery', event)" class="p-1 px-2 rounded transition-colors ${!isListMode ? 'bg-surface-800 text-brand-400' : 'text-surface-500 hover:text-white'}" title="Gallery View"><i class="fas fa-th-large"></i></button>
-            <button onclick="setTeamView('list', event)" class="p-1 px-2 rounded transition-colors ${isListMode ? 'bg-surface-800 text-brand-400' : 'text-surface-500 hover:text-white'}" title="List View"><i class="fas fa-list"></i></button>
+            <button id="team-view-gallery" onclick="setTeamView('gallery', event)" class="p-1 px-2 rounded transition-colors ${!isListMode ? 'bg-[#4285F4]/20 text-[#4285F4]' : 'text-surface-500 hover:text-[#4285F4] hover:bg-[#4285F4]/10'}" title="Gallery View"><i class="fas fa-th-large"></i></button>
+            <button id="team-view-list" onclick="setTeamView('list', event)" class="p-1 px-2 rounded transition-colors ${isListMode ? 'bg-[#4285F4]/20 text-[#4285F4]' : 'text-surface-500 hover:text-[#4285F4] hover:bg-[#4285F4]/10'}" title="List View"><i class="fas fa-list"></i></button>
           </div>
-          ${APP.currentRole === 'admin' ? '<button class="btn btn-primary btn-sm" onclick="showAddMemberModal()"><i class="fas fa-plus"></i> Add Member</button>' : ''}
+          ${APP.currentRole === 'admin' ? '<button class="btn !bg-[#4285F4] !text-white hover:!bg-[#3367d6] hover:shadow-lg hover:shadow-[#4285F4]/20 border-none transition-all rounded-md font-semibold px-4 py-2 text-xs flex items-center gap-2" onclick="showAddMemberModal()"><i class="fas fa-plus"></i> Add Member</button>' : ''}
         </div>
       </div>
       ${viewContent}
@@ -2743,7 +3999,7 @@ function filterTeamRole(role, event) {
     const btn = document.getElementById(`sub_${r}`);
     if (btn) {
       if (r === role) {
-        btn.className = "flex items-center gap-2 py-1.5 px-3 rounded-md transition-all text-left font-medium text-brand-400 bg-brand-500/10";
+        btn.className = "flex items-center gap-2 py-1.5 px-3 rounded-md transition-all text-left font-medium text-[#4285F4] bg-[#4285F4]/10";
       } else {
         btn.className = "flex items-center gap-2 py-1.5 px-3 rounded-md transition-all text-left font-medium text-surface-400 hover:text-white";
       }
@@ -2765,11 +4021,11 @@ function setTeamView(view, event) {
   const btnList = document.getElementById('sub_view_list');
   if (btnGallery && btnList) {
     if (view === 'gallery') {
-      btnGallery.className = "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-md transition-all font-medium text-brand-400 bg-brand-500/10 text-[11px]";
+      btnGallery.className = "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-md transition-all font-medium text-[#4285F4] bg-[#4285F4]/10 text-[11px]";
       btnList.className = "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-md transition-all font-medium text-surface-400 hover:text-white bg-surface-800/40 hover:bg-surface-800/70 text-[11px]";
     } else {
       btnGallery.className = "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-md transition-all font-medium text-surface-400 hover:text-white bg-surface-800/40 hover:bg-surface-800/70 text-[11px]";
-      btnList.className = "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-md transition-all font-medium text-brand-400 bg-brand-500/10 text-[11px]";
+      btnList.className = "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-1 rounded-md transition-all font-medium text-[#4285F4] bg-[#4285F4]/10 text-[11px]";
     }
   }
 
@@ -2865,7 +4121,7 @@ function renderAllocations() {
               <div class="flex items-center gap-4">
                 <span class="text-sm text-white w-32 truncate">${a.name}</span>
                 <div class="flex-1 h-3 bg-surface-800 rounded-full overflow-hidden">
-                  <div class="h-full rounded-full transition-all ${pct > 80 ? 'bg-rose-500' : pct > 50 ? 'bg-amber-500' : 'bg-brand-500'}" style="width:${pct}%"></div>
+                  <div class="h-full rounded-full transition-all ${pct > 80 ? 'bg-rose-500' : 'bg-white'}" style="width:${pct}%"></div>
                 </div>
                 <span class="text-sm text-surface-400 w-16 text-right">${count} leads</span>
               </div>
@@ -2982,23 +4238,23 @@ function renderSettings() {
       
       <!-- Tab Navigation -->
       <div class="flex border-b border-surface-800 mb-6 gap-2 overflow-x-auto pb-1 scrollbar-thin">
-        <button onclick="changeSettingsTab('general')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'general' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
-          <i class="fas fa-cog"></i> General
+        <button id="settings-tab-general" onclick="changeSettingsTab('general')" class="px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${APP.activeSettingsTab === 'general' ? 'border-[#4285F4] text-[#4285F4] bg-[#4285F4]/5 rounded-t-lg' : 'border-transparent text-surface-400 hover:text-white hover:bg-surface-800/20 rounded-t-lg'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-cog ${APP.activeSettingsTab === 'general' ? 'text-[#4285F4]' : 'text-[#4285F4]/70'}"></i> General
         </button>
-        <button onclick="changeSettingsTab('leads')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'leads' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
-          <i class="fas fa-filter"></i> Leads Config
+        <button id="settings-tab-leads" onclick="changeSettingsTab('leads')" class="px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${APP.activeSettingsTab === 'leads' ? 'border-[#34A853] text-[#34A853] bg-[#34A853]/5 rounded-t-lg' : 'border-transparent text-surface-400 hover:text-white hover:bg-surface-800/20 rounded-t-lg'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-filter ${APP.activeSettingsTab === 'leads' ? 'text-[#34A853]' : 'text-[#34A853]/70'}"></i> Leads Config
         </button>
-        <button onclick="changeSettingsTab('teams')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'teams' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
-          <i class="fas fa-users"></i> Teams
+        <button id="settings-tab-teams" onclick="changeSettingsTab('teams')" class="px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${APP.activeSettingsTab === 'teams' ? 'border-[#FBBC05] text-[#FBBC05] bg-[#FBBC05]/5 rounded-t-lg' : 'border-transparent text-surface-400 hover:text-white hover:bg-surface-800/20 rounded-t-lg'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-users ${APP.activeSettingsTab === 'teams' ? 'text-[#FBBC05]' : 'text-[#FBBC05]/70'}"></i> Teams
         </button>
-        <button onclick="changeSettingsTab('system')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'system' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
-          <i class="fas fa-database"></i> Automation & Backup
+        <button id="settings-tab-system" onclick="changeSettingsTab('system')" class="px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${APP.activeSettingsTab === 'system' ? 'border-[#EA4335] text-[#EA4335] bg-[#EA4335]/5 rounded-t-lg' : 'border-transparent text-surface-400 hover:text-white hover:bg-surface-800/20 rounded-t-lg'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-database ${APP.activeSettingsTab === 'system' ? 'text-[#EA4335]' : 'text-[#EA4335]/70'}"></i> Automation & Backup
         </button>
-        <button onclick="changeSettingsTab('emails')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'emails' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
-          <i class="fas fa-envelope"></i> Email Templates
+        <button id="settings-tab-emails" onclick="changeSettingsTab('emails')" class="px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${APP.activeSettingsTab === 'emails' ? 'border-[#4285F4] text-[#4285F4] bg-[#4285F4]/5 rounded-t-lg' : 'border-transparent text-surface-400 hover:text-white hover:bg-surface-800/20 rounded-t-lg'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-envelope ${APP.activeSettingsTab === 'emails' ? 'text-[#4285F4]' : 'text-[#4285F4]/70'}"></i> Email Templates
         </button>
-        <button onclick="changeSettingsTab('targets')" class="px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${APP.activeSettingsTab === 'targets' ? 'border-brand-500 text-brand-400 font-semibold' : 'border-transparent text-surface-400 hover:text-white'} flex items-center gap-2 whitespace-nowrap">
-          <i class="fas fa-bullseye"></i> Targets
+        <button id="settings-tab-targets" onclick="changeSettingsTab('targets')" class="px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${APP.activeSettingsTab === 'targets' ? 'border-[#34A853] text-[#34A853] bg-[#34A853]/5 rounded-t-lg' : 'border-transparent text-surface-400 hover:text-white hover:bg-surface-800/20 rounded-t-lg'} flex items-center gap-2 whitespace-nowrap">
+          <i class="fas fa-bullseye ${APP.activeSettingsTab === 'targets' ? 'text-[#34A853]' : 'text-[#34A853]/70'}"></i> Targets
         </button>
       </div>
 
@@ -3007,17 +4263,17 @@ function renderSettings() {
           <div class="card">
             <h3 class="font-display font-semibold text-white mb-4">Appearance</h3>
             <div class="flex items-center gap-4">
-              <button class="flex-1 p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-3 ${APP.theme === 'dark' ? 'border-brand-500 bg-brand-500/10' : 'border-surface-800 hover:border-surface-700'}" onclick="setTheme('dark')">
+              <button class="flex-1 p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-3 ${APP.theme === 'dark' ? 'border-surface-400 bg-surface-400/10' : 'border-surface-800 hover:border-surface-700'}" onclick="setTheme('dark')">
                 <div class="w-12 h-12 rounded-lg bg-surface-900 flex items-center justify-center text-white">
                   <i class="fas fa-moon"></i>
                 </div>
-                <span class="font-medium ${APP.theme === 'dark' ? 'text-brand-400' : 'text-surface-400'}">Dark Mode</span>
+                <span class="font-medium ${APP.theme === 'dark' ? 'text-white font-semibold' : 'text-surface-400'}">Dark Mode</span>
               </button>
-              <button class="flex-1 p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-3 ${APP.theme === 'light' ? 'border-brand-500 bg-brand-500/10' : 'border-surface-800 hover:border-surface-700'}" onclick="setTheme('light')">
+              <button class="flex-1 p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-3 ${APP.theme === 'light' ? 'border-surface-400 bg-surface-400/10' : 'border-surface-800 hover:border-surface-700'}" onclick="setTheme('light')">
                 <div class="w-12 h-12 rounded-lg bg-white border border-surface-200 flex items-center justify-center text-surface-900">
                   <i class="fas fa-sun"></i>
                 </div>
-                <span class="font-medium ${APP.theme === 'light' ? 'text-brand-400' : 'text-surface-400'}">Light Mode</span>
+                <span class="font-medium ${APP.theme === 'light' ? 'text-white font-semibold' : 'text-surface-400'}">Light Mode</span>
               </button>
             </div>
           </div>
@@ -3102,6 +4358,44 @@ function renderSettings() {
           </div>
 
           <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Lead Categories</h3>
+            <div class="space-y-2">
+              ${LEAD_CATEGORIES.map(c => `
+                <div class="flex items-center justify-between py-2 border-b border-surface-800 last:border-0">
+                  <div class="flex items-center gap-3">
+                    <i class="fas fa-grip-vertical text-surface-600"></i>
+                    <span class="text-white">${CATEGORY_LABELS[c] || c} <span class="text-xs text-surface-500">(${c})</span></span>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn-ghost btn-sm text-xs" onclick="showEditLeadCategoryModal('${c}')"><i class="fas fa-edit"></i></button>
+                    ${LEAD_CATEGORIES.length > 1 ? `<button class="btn-ghost btn-sm text-xs text-rose-400" onclick="deleteLeadCategory('${c}')"><i class="fas fa-trash"></i></button>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddLeadCategoryModal()"><i class="fas fa-plus"></i> Add Lead Category</button>
+          </div>
+
+          <div class="card">
+            <h3 class="font-display font-semibold text-white mb-4">Cities</h3>
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+              ${CITIES.map(c => `
+                <div class="flex items-center justify-between py-2 border-b border-surface-800 last:border-0">
+                  <div class="flex items-center gap-3">
+                    <i class="fas fa-grip-vertical text-surface-600"></i>
+                    <span class="text-white">${CITY_LABELS[c] || c} <span class="text-xs text-surface-500">(${c})</span></span>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn-ghost btn-sm text-xs" onclick="showEditCityModal('${c}')"><i class="fas fa-edit"></i></button>
+                    ${CITIES.length > 1 ? `<button class="btn-ghost btn-sm text-xs text-rose-400" onclick="deleteCity('${c}')"><i class="fas fa-trash"></i></button>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddCityModal()"><i class="fas fa-plus"></i> Add City</button>
+          </div>
+
+          <div class="card">
             <h3 class="font-display font-semibold text-white mb-4">Lead Sources</h3>
             <div class="flex flex-wrap gap-2">
               ${SOURCES.map(s => `
@@ -3116,7 +4410,7 @@ function renderSettings() {
           </div>
 
           <div class="card">
-            <h3 class="font-display font-semibold text-white mb-4">Loan Types</h3>
+            <h3 class="font-display font-semibold text-white mb-4">Product Types</h3>
             <div class="space-y-2">
               ${LOAN_TYPES.map((lt, i) => `
                 <div class="flex items-center justify-between py-2 border-b border-surface-800 last:border-0">
@@ -3131,7 +4425,7 @@ function renderSettings() {
                 </div>
               `).join('')}
             </div>
-            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddLoanTypeModal()"><i class="fas fa-plus"></i> Add Loan Type</button>
+            <button class="btn btn-secondary btn-sm mt-3" onclick="showAddLoanTypeModal()"><i class="fas fa-plus"></i> Add Product Type</button>
           </div>
         ` : ''}
 
@@ -3364,7 +4658,7 @@ let workHistoryColumns = {
   phone: { label: 'Phone', visible: true },
   email: { label: 'Email', visible: true },
   loanAmount: { label: 'Loan Amount', visible: true },
-  loanType: { label: 'Loan Type', visible: true },
+  loanType: { label: 'Product Type', visible: true },
   leadStatus: { label: 'Lead Status', visible: true },
   priority: { label: 'Priority', visible: true },
   aging: { label: 'Aging', visible: true },
@@ -3509,6 +4803,7 @@ function getFilteredEmails() {
 
 function handleEmailHistorySearch(val) {
   emailHistoryFilter.search = val;
+  APP.emailHistoryPage = 1;
   renderPage();
 }
 
@@ -3527,13 +4822,14 @@ function exportEmailHistoryToCSV() {
     const teamId = agent ? (agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : agent.team_id) : null;
     const team = getTeam(teamId);
 
-    const formattedTime = new Date(c.created_at).toLocaleString('en-US', {
+    const formattedTime = new Date(c.created_at).toLocaleString('en-IN', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
     });
 
     const agentName = agent ? agent.name : 'Unknown Agent';
@@ -3662,76 +4958,8 @@ function getFilteredCalls() {
 
 function handleWorkHistorySearch(val) {
   workHistoryFilter.search = val;
-  const list = getFilteredCalls();
-  
-  const countEl = document.getElementById('workHistoryCount');
-  if (countEl) countEl.textContent = `${list.length} calls recorded`;
-  
-  const tbody = document.getElementById('workHistoryTableBody');
-  if (tbody) {
-    if (list.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="12" class="text-center py-12 text-surface-500">
-            <div class="flex flex-col items-center justify-center">
-              <i class="fas fa-phone-slash text-4xl mb-3 text-surface-600"></i>
-              <p class="font-medium text-surface-400">No call history found</p>
-              <p class="text-xs text-surface-600 mt-1">Try adjusting your filters or search term</p>
-            </div>
-          </td>
-        </tr>
-      `;
-    } else {
-      tbody.innerHTML = list.map(c => {
-        const lead = leads.find(l => l.id === c.lead_id || l._id === c.lead_id);
-        const agent = getUser(c.agent_id);
-        
-        const leadName = lead ? `<span class="text-white hover:underline cursor-pointer font-medium" onclick="showLeadDetail('${lead.id || lead._id}')">${lead.name}</span>` : '<span class="text-surface-500 italic">Unknown Lead</span>';
-        const leadPhone = lead ? lead.phone : '—';
-        const leadStatus = lead ? `<span class="badge ${getStatusBadgeClass(lead.status)}">${STATUS_LABELS[lead.status] || lead.status}</span>` : '—';
-        const loanType = lead ? (LOAN_LABELS[lead.loan_type] || lead.loan_type || '—') : '—';
-        
-        const leadPriorityVal = lead ? (lead.priority || 'cold').toLowerCase().trim() : 'cold';
-        let priorityBadgeClass = 'badge-contacted'; // cold
-        if (leadPriorityVal === 'hot') priorityBadgeClass = 'badge-hot';
-        else if (leadPriorityVal === 'warm') priorityBadgeClass = 'badge-documents-pending';
-        const leadPriority = lead ? `<span class="badge ${priorityBadgeClass}">${PRIORITY_LABELS[leadPriorityVal] || leadPriorityVal}</span>` : '—';
-
-        const agentName = agent ? agent.name : '<span class="text-surface-500 italic">Unknown Agent</span>';
-        const teamId = agent ? (agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : agent.team_id) : null;
-        const team = getTeam(teamId);
-        const teamName = team ? team.name : '—';
-        
-        const formattedTime = new Date(c.created_at).toLocaleString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-
-        const outcomeBadge = `<span class="badge ${getOutcomeBadgeClass(c.outcome)}">${OUTCOME_LABELS[c.outcome] || c.outcome}</span>`;
-        const followUpBadge = c.follow_up_at ? `<span class="badge badge-documents-pending"><i class="fas fa-calendar-alt mr-1 text-[10px]"></i> ${new Date(c.follow_up_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>` : '—';
-        
-        return `
-          <tr class="hover:bg-surface-800/30">
-            <td class="text-surface-400 whitespace-nowrap text-xs">${formattedTime}</td>
-            <td class="text-white font-medium whitespace-nowrap">${agentName}</td>
-            <td class="text-surface-400 whitespace-nowrap text-sm">${teamName}</td>
-            <td class="text-white whitespace-nowrap">${leadName}</td>
-            <td class="text-surface-400 whitespace-nowrap text-sm">${leadPhone}</td>
-            <td class="font-medium text-white whitespace-nowrap">${lead ? formatCurrency(lead.amount_requested) : '—'}</td>
-            <td class="text-surface-400 whitespace-nowrap text-sm capitalize">${loanType}</td>
-            <td class="whitespace-nowrap">${leadStatus}</td>
-            <td class="whitespace-nowrap">${leadPriority}</td>
-            <td class="whitespace-nowrap">${outcomeBadge}</td>
-            <td class="text-surface-300 text-sm max-w-xs truncate" title="${c.notes || ''}">${c.notes || '—'}</td>
-            <td class="whitespace-nowrap">${followUpBadge}</td>
-          </tr>
-        `;
-      }).join('');
-    }
-  }
+  APP.workHistoryPage = 1;
+  renderPage();
 }
 
 function exportWorkHistoryToCSV() {
@@ -3749,7 +4977,7 @@ function exportWorkHistoryToCSV() {
     { key: 'phone', label: 'Phone' },
     { key: 'email', label: 'Email' },
     { key: 'loanAmount', label: 'Loan Amount' },
-    { key: 'loanType', label: 'Loan Type' },
+    { key: 'loanType', label: 'Product Type' },
     { key: 'leadStatus', label: 'Lead Status' },
     { key: 'priority', label: 'Priority' },
     { key: 'aging', label: 'Aging' },
@@ -3773,13 +5001,14 @@ function exportWorkHistoryToCSV() {
     const teamId = agent ? (agent.team_id && typeof agent.team_id === 'object' ? (agent.team_id._id || agent.team_id.id) : agent.team_id) : null;
     const team = getTeam(teamId);
 
-    const formattedTime = new Date(c.created_at).toLocaleString('en-US', {
+    const formattedTime = new Date(c.created_at).toLocaleString('en-IN', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
     });
 
     const agentName = agent ? agent.name : 'Unknown Agent';
@@ -3793,7 +5022,7 @@ function exportWorkHistoryToCSV() {
     const leadPriorityVal = lead ? (PRIORITY_LABELS[lead.priority] || lead.priority || 'cold') : '—';
     const outcomeVal = OUTCOME_LABELS[c.outcome] || c.outcome || '—';
     const notesVal = c.notes || '—';
-    const followUpVal = c.follow_up_due ? new Date(c.follow_up_due).toLocaleDateString() : '—';
+    const followUpVal = c.follow_up_due ? new Date(c.follow_up_due).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—';
 
     return activeCols.map(col => {
       switch (col.key) {
@@ -4233,22 +5462,35 @@ function renderEmailHistory() {
       
   const teams = TEAMS;
 
+  // Pagination logic (25 items per page)
+  const PAGE_SIZE = 25;
+  const totalPages = Math.ceil(list.length / PAGE_SIZE) || 1;
+  if (APP.emailHistoryPage > totalPages) APP.emailHistoryPage = totalPages;
+  const start = (APP.emailHistoryPage - 1) * PAGE_SIZE;
+  const paginatedList = list.slice(start, start + PAGE_SIZE);
+
   return `
     <div class="fade-in">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h2 class="font-display font-bold text-2xl text-white">Footprints</h2>
           <div class="flex items-center gap-4 mt-2">
-            <div class="flex items-center gap-1 bg-surface-800 p-1 rounded-lg">
-              <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${APP.currentFootprintTab === 'workHistory' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:text-white'}" onclick="setFootprintTab('workHistory')">Work History</button>
-              <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${APP.currentFootprintTab === 'emailHistory' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:text-white'}" onclick="setFootprintTab('emailHistory')">Email History</button>
+            <div class="flex items-center gap-1.5 bg-surface-900/60 p-1 rounded-lg border border-surface-800">
+              <button class="px-3.5 py-1.5 text-sm font-semibold rounded-md transition-all flex items-center gap-2 ${APP.currentFootprintTab === 'workHistory' ? 'bg-[#4285F4] text-white shadow-lg shadow-[#4285F4]/20 scale-[1.02]' : 'text-surface-400 hover:text-white hover:bg-surface-800'}" onclick="setFootprintTab('workHistory')">
+                <i class="fas fa-phone-alt ${APP.currentFootprintTab === 'workHistory' ? 'text-white' : 'text-[#4285F4]'}"></i>
+                <span>Work History</span>
+              </button>
+              <button class="px-3.5 py-1.5 text-sm font-semibold rounded-md transition-all flex items-center gap-2 ${APP.currentFootprintTab === 'emailHistory' ? 'bg-[#EA4335] text-white shadow-lg shadow-[#EA4335]/20 scale-[1.02]' : 'text-surface-400 hover:text-white hover:bg-surface-800'}" onclick="setFootprintTab('emailHistory')">
+                <i class="fas fa-envelope ${APP.currentFootprintTab === 'emailHistory' ? 'text-white' : 'text-[#EA4335]'}"></i>
+                <span>Email History</span>
+              </button>
             </div>
             <span class="text-surface-400 text-sm hidden sm:inline-block">|</span>
             <p class="text-surface-400 text-sm">${list.length} emails recorded</p>
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button class="btn btn-primary text-sm flex items-center gap-2" onclick="exportEmailHistoryToCSV()">
+          <button class="btn !bg-[#4285F4] !text-white hover:!bg-[#3367d6] hover:shadow-lg hover:shadow-[#4285F4]/20 border-none transition-all text-sm flex items-center gap-2" onclick="exportEmailHistoryToCSV()">
             <i class="fas fa-file-export"></i> Export CSV
           </button>
         </div>
@@ -4260,20 +5502,20 @@ function renderEmailHistory() {
           <input type="text" class="form-input py-2 text-sm w-64" placeholder="Search lead, agent, subject..." value="${emailHistoryFilter.search}" oninput="handleEmailHistorySearch(this.value)">
           
           ${APP.currentRole === 'admin' ? `
-            <select class="form-input py-2 text-sm w-48" onchange="emailHistoryFilter.teamId=this.value; renderPage()">
+            <select class="form-input py-2 text-sm w-48" onchange="emailHistoryFilter.teamId=this.value; APP.emailHistoryPage=1; renderPage()">
               <option value="all" ${emailHistoryFilter.teamId === 'all' ? 'selected' : ''}>All Teams</option>
               ${teams.map(t => `<option value="${t.id || t._id}" ${emailHistoryFilter.teamId === (t.id || t._id) ? 'selected' : ''}>${t.name}</option>`).join('')}
             </select>
           ` : ''}
           
           ${(APP.currentRole === 'admin' || APP.currentRole === 'tl') ? `
-            <select class="form-input py-2 text-sm w-48" onchange="emailHistoryFilter.agentId=this.value; renderPage()">
+            <select class="form-input py-2 text-sm w-48" onchange="emailHistoryFilter.agentId=this.value; APP.emailHistoryPage=1; renderPage()">
               <option value="all" ${emailHistoryFilter.agentId === 'all' ? 'selected' : ''}>All Agents</option>
               ${agents.map(a => `<option value="${a.id || a._id}" ${emailHistoryFilter.agentId === (a.id || a._id) ? 'selected' : ''}>${a.name}</option>`).join('')}
             </select>
           ` : ''}
 
-          <select class="form-input py-2 text-sm w-48" onchange="emailHistoryFilter.dateRange=this.value; renderPage()">
+          <select class="form-input py-2 text-sm w-48" onchange="emailHistoryFilter.dateRange=this.value; APP.emailHistoryPage=1; renderPage()">
             <option value="7" ${emailHistoryFilter.dateRange === '7' ? 'selected' : ''}>Last 7 Days</option>
             <option value="30" ${emailHistoryFilter.dateRange === '30' ? 'selected' : ''}>Last 30 Days</option>
             <option value="90" ${emailHistoryFilter.dateRange === '90' ? 'selected' : ''}>Last 90 Days</option>
@@ -4283,51 +5525,65 @@ function renderEmailHistory() {
 
           ${isCustom ? `
             <div class="flex items-center gap-2">
-              <input type="date" class="form-input py-2 text-xs w-auto" value="${emailHistoryFilter.startDate}" onchange="emailHistoryFilter.startDate=this.value; renderPage()">
+              <input type="date" class="form-input py-2 text-xs w-auto" value="${emailHistoryFilter.startDate}" onchange="emailHistoryFilter.startDate=this.value; APP.emailHistoryPage=1; renderPage()">
               <span class="text-surface-500">to</span>
-              <input type="date" class="form-input py-2 text-xs w-auto" value="${emailHistoryFilter.endDate}" onchange="emailHistoryFilter.endDate=this.value; renderPage()">
+              <input type="date" class="form-input py-2 text-xs w-auto" value="${emailHistoryFilter.endDate}" onchange="emailHistoryFilter.endDate=this.value; APP.emailHistoryPage=1; renderPage()">
             </div>
           ` : ''}
 
-          <button class="btn btn-ghost btn-sm" onclick="emailHistoryFilter={search:'',agentId:'all',teamId:'all',dateRange:'30',startDate:'',endDate:''};renderPage()"><i class="fas fa-times"></i> Clear</button>
+          <button class="btn btn-ghost text-sm text-surface-400 hover:text-white transition-colors" onclick="emailHistoryFilter={search:'',agentId:'all',teamId:'all',dateRange:'30',startDate:'',endDate:''}; APP.emailHistoryPage=1; renderPage()">
+            <i class="fas fa-times"></i> Clear Filter
+          </button>
         </div>
       </div>
 
-      <div class="card overflow-hidden">
-        <table class="w-full">
-          <thead>
-            <tr class="border-b border-surface-800 text-left text-xs uppercase text-surface-400">
-              <th class="px-4 py-3">Date & Time</th>
-              <th class="px-4 py-3">Agent</th>
-              <th class="px-4 py-3">Team</th>
-              <th class="px-4 py-3">Lead Name</th>
-              <th class="px-4 py-3">Lead Number</th>
-              <th class="px-4 py-3">To</th>
-              <th class="px-4 py-3">Subject</th>
-              <th class="px-4 py-3">Body Text</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-surface-800">
-            ${list.map(e => {
-              const agent = USERS.find(u => u.id === e.agent_id || u._id === e.agent_id);
-              const team = agent ? TEAMS.find(t => t.id === agent.team_id || t._id === agent.team_id) : null;
-              const lead = leads.find(l => l.id === e.lead_id || l._id === e.lead_id);
-              return `
-              <tr class="text-sm text-surface-300 hover:bg-surface-800/30 transition-colors">
-                <td class="px-4 py-3">${new Date(e.created_at).toLocaleString()}</td>
-                <td class="px-4 py-3">${agent?.name || 'Unknown'}</td>
-                <td class="px-4 py-3">${team?.name || '—'}</td>
-                <td class="px-4 py-3">${lead?.name || 'Unknown'}</td>
-                <td class="px-4 py-3">${lead?.phone || '—'}</td>
-                <td class="px-4 py-3">${e.to}</td>
-                <td class="px-4 py-3 font-medium text-white">${e.subject}</td>
-                <td class="px-4 py-3 max-w-xs truncate" title="${e.body.replace(/"/g, '&quot;')}">${e.body}</td>
+      <div class="card p-0 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b border-surface-800 text-left text-xs uppercase text-surface-400 whitespace-nowrap">
+                <th class="px-4 py-3">Date & Time</th>
+                <th class="px-4 py-3">Agent</th>
+                <th class="px-4 py-3">Team</th>
+                <th class="px-4 py-3">Lead Name</th>
+                <th class="px-4 py-3">Lead Number</th>
+                <th class="px-4 py-3">To</th>
+                <th class="px-4 py-3">Subject</th>
+                <th class="px-4 py-3">Body Text</th>
               </tr>
-            `;
-            }).join('')}
-            ${list.length === 0 ? '<tr><td colspan="8" class="px-4 py-8 text-center text-surface-500">No emails found</td></tr>' : ''}
-          </tbody>
-        </table>
+            </thead>
+            <tbody class="divide-y divide-surface-800 whitespace-nowrap">
+              ${paginatedList.map(e => {
+                const agent = USERS.find(u => u.id === e.agent_id || u._id === e.agent_id);
+                const team = agent ? TEAMS.find(t => t.id === agent.team_id || t._id === agent.team_id) : null;
+                const lead = leads.find(l => l.id === e.lead_id || l._id === e.lead_id);
+                return `
+                <tr class="text-sm text-surface-300 hover:bg-surface-800/30 transition-colors">
+                  <td class="px-4 py-3">${new Date(e.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+                  <td class="px-4 py-3">${agent?.name || 'Unknown'}</td>
+                  <td class="px-4 py-3">${team?.name || '—'}</td>
+                  <td class="px-4 py-3">${lead?.name || 'Unknown'}</td>
+                  <td class="px-4 py-3">${lead?.phone || '—'}</td>
+                  <td class="px-4 py-3">${e.to}</td>
+                  <td class="px-4 py-3 font-medium text-white">${e.subject}</td>
+                  <td class="px-4 py-3 min-w-[300px]" title="${e.body.replace(/"/g, '&quot;')}">${e.body}</td>
+                </tr>
+              `;
+              }).join('')}
+              ${paginatedList.length === 0 ? '<tr><td colspan="8" class="px-4 py-8 text-center text-surface-500">No emails found</td></tr>' : ''}
+            </tbody>
+          </table>
+        </div>
+        <!-- Pagination -->
+        <div class="flex items-center justify-between p-4 border-t border-surface-800">
+            <span class="text-sm text-surface-400">Page ${APP.emailHistoryPage} of ${totalPages}</span>
+            <div class="flex gap-2">
+                <button class="btn btn-secondary btn-sm ${APP.emailHistoryPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}" 
+                    onclick="if(APP.emailHistoryPage > 1) changeEmailHistoryPage(-1)" ${APP.emailHistoryPage === 1 ? 'disabled' : ''}>Back</button>
+                <button class="btn btn-secondary btn-sm ${APP.emailHistoryPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}" 
+                    onclick="if(APP.emailHistoryPage < ${totalPages}) changeEmailHistoryPage(1)" ${APP.emailHistoryPage === totalPages ? 'disabled' : ''}>Next</button>
+            </div>
+        </div>
       </div>
     </div>
   `;
@@ -4344,15 +5600,28 @@ function renderWorkHistory() {
 
   const visibleColsCount = Object.values(workHistoryColumns).filter(c => c.visible).length;
 
+  // Pagination logic (25 items per page)
+  const PAGE_SIZE = 25;
+  const totalPages = Math.ceil(list.length / PAGE_SIZE) || 1;
+  if (APP.workHistoryPage > totalPages) APP.workHistoryPage = totalPages;
+  const start = (APP.workHistoryPage - 1) * PAGE_SIZE;
+  const paginatedList = list.slice(start, start + PAGE_SIZE);
+
   return `
     <div class="fade-in">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h2 class="font-display font-bold text-2xl text-white">Footprints</h2>
           <div class="flex items-center gap-4 mt-2">
-            <div class="flex items-center gap-1 bg-surface-800 p-1 rounded-lg">
-              <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${APP.currentFootprintTab === 'workHistory' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:text-white'}" onclick="setFootprintTab('workHistory')">Work History</button>
-              <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${APP.currentFootprintTab === 'emailHistory' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:text-white'}" onclick="setFootprintTab('emailHistory')">Email History</button>
+            <div class="flex items-center gap-1.5 bg-surface-900/60 p-1 rounded-lg border border-surface-800">
+              <button class="px-3.5 py-1.5 text-sm font-semibold rounded-md transition-all flex items-center gap-2 ${APP.currentFootprintTab === 'workHistory' ? 'bg-[#4285F4] text-white shadow-lg shadow-[#4285F4]/20 scale-[1.02]' : 'text-surface-400 hover:text-white hover:bg-surface-800'}" onclick="setFootprintTab('workHistory')">
+                <i class="fas fa-phone-alt ${APP.currentFootprintTab === 'workHistory' ? 'text-white' : 'text-[#4285F4]'}"></i>
+                <span>Work History</span>
+              </button>
+              <button class="px-3.5 py-1.5 text-sm font-semibold rounded-md transition-all flex items-center gap-2 ${APP.currentFootprintTab === 'emailHistory' ? 'bg-[#EA4335] text-white shadow-lg shadow-[#EA4335]/20 scale-[1.02]' : 'text-surface-400 hover:text-white hover:bg-surface-800'}" onclick="setFootprintTab('emailHistory')">
+                <i class="fas fa-envelope ${APP.currentFootprintTab === 'emailHistory' ? 'text-white' : 'text-[#EA4335]'}"></i>
+                <span>Email History</span>
+              </button>
             </div>
             <span class="text-surface-400 text-sm hidden sm:inline-block">|</span>
             <p id="workHistoryCount" class="text-surface-400 text-sm">${list.length} calls recorded</p>
@@ -4362,7 +5631,7 @@ function renderWorkHistory() {
           <button class="btn btn-secondary text-sm flex items-center gap-2" onclick="showColumnSelector = !showColumnSelector; renderPage()">
             <i class="fas fa-columns"></i> Columns
           </button>
-          <button class="btn btn-primary text-sm flex items-center gap-2" onclick="exportWorkHistoryToCSV()">
+          <button class="btn !bg-[#4285F4] !text-white hover:!bg-[#3367d6] hover:shadow-lg hover:shadow-[#4285F4]/20 border-none transition-all text-sm flex items-center gap-2" onclick="exportWorkHistoryToCSV()">
             <i class="fas fa-file-export"></i> Export CSV
           </button>
         </div>
@@ -4405,13 +5674,13 @@ function renderWorkHistory() {
           <input type="text" class="form-input py-2 text-sm w-64" placeholder="Search lead, agent, notes..." value="${workHistoryFilter.search}" oninput="handleWorkHistorySearch(this.value)">
           
           ${(APP.currentRole === 'admin' || APP.currentRole === 'tl') ? `
-            <select class="form-input py-2 text-sm w-48" onchange="workHistoryFilter.agentId=this.value; renderPage()">
+            <select class="form-input py-2 text-sm w-48" onchange="workHistoryFilter.agentId=this.value; APP.workHistoryPage=1; renderPage()">
               <option value="all" ${workHistoryFilter.agentId === 'all' ? 'selected' : ''}>All Agents</option>
               ${agents.map(a => `<option value="${a.id || a._id}" ${workHistoryFilter.agentId === (a.id || a._id) ? 'selected' : ''}>${a.name}</option>`).join('')}
             </select>
           ` : ''}
 
-          <select class="form-input py-2 text-sm w-48" onchange="workHistoryFilter.outcome=this.value; renderPage()">
+          <select class="form-input py-2 text-sm w-48" onchange="workHistoryFilter.outcome=this.value; APP.workHistoryPage=1; renderPage()">
             <option value="all" ${workHistoryFilter.outcome === 'all' ? 'selected' : ''}>All Outcomes</option>
             <option value="answered" ${workHistoryFilter.outcome === 'answered' ? 'selected' : ''}>Answered</option>
             <option value="not_answered" ${workHistoryFilter.outcome === 'not_answered' ? 'selected' : ''}>Not Answered</option>
@@ -4420,14 +5689,14 @@ function renderWorkHistory() {
             <option value="callback_requested" ${workHistoryFilter.outcome === 'callback_requested' ? 'selected' : ''}>Callback Requested</option>
           </select>
 
-          <select class="form-input py-2 text-sm w-48" onchange="workHistoryFilter.priority=this.value; renderPage()">
+          <select class="form-input py-2 text-sm w-48" onchange="workHistoryFilter.priority=this.value; APP.workHistoryPage=1; renderPage()">
             <option value="all" ${workHistoryFilter.priority === 'all' ? 'selected' : ''}>All Priorities</option>
             <option value="cold" ${workHistoryFilter.priority === 'cold' ? 'selected' : ''}>Cold</option>
             <option value="warm" ${workHistoryFilter.priority === 'warm' ? 'selected' : ''}>Warm</option>
             <option value="hot" ${workHistoryFilter.priority === 'hot' ? 'selected' : ''}>Hot</option>
           </select>
 
-          <select class="form-input py-2 text-sm w-48" onchange="workHistoryFilter.dateRange=this.value; renderPage()">
+          <select class="form-input py-2 text-sm w-48" onchange="workHistoryFilter.dateRange=this.value; APP.workHistoryPage=1; renderPage()">
             <option value="7" ${workHistoryFilter.dateRange === '7' ? 'selected' : ''}>Last 7 Days</option>
             <option value="30" ${workHistoryFilter.dateRange === '30' ? 'selected' : ''}>Last 30 Days</option>
             <option value="90" ${workHistoryFilter.dateRange === '90' ? 'selected' : ''}>Last 90 Days</option>
@@ -4437,13 +5706,15 @@ function renderWorkHistory() {
 
           ${isCustom ? `
             <div class="flex items-center gap-2">
-              <input type="date" class="form-input py-2 text-xs w-auto" value="${workHistoryFilter.startDate}" onchange="workHistoryFilter.startDate=this.value; renderPage()">
+              <input type="date" class="form-input py-2 text-xs w-auto" value="${workHistoryFilter.startDate}" onchange="workHistoryFilter.startDate=this.value; APP.workHistoryPage=1; renderPage()">
               <span class="text-surface-500">to</span>
-              <input type="date" class="form-input py-2 text-xs w-auto" value="${workHistoryFilter.endDate}" onchange="workHistoryFilter.endDate=this.value; renderPage()">
+              <input type="date" class="form-input py-2 text-xs w-auto" value="${workHistoryFilter.endDate}" onchange="workHistoryFilter.endDate=this.value; APP.workHistoryPage=1; renderPage()">
             </div>
           ` : ''}
 
-          <button class="btn btn-ghost btn-sm" onclick="workHistoryFilter={search:'',agentId:'all',dateRange:'30',startDate:'',endDate:'',outcome:'all',priority:'all'};renderPage()"><i class="fas fa-times"></i> Clear</button>
+          <button class="btn btn-ghost text-sm text-surface-400 hover:text-white transition-colors" onclick="workHistoryFilter={search:'',agentId:'all',dateRange:'30',startDate:'',endDate:'',outcome:'all',priority:'all'}; APP.workHistoryPage=1; renderPage()">
+            <i class="fas fa-times"></i> Clear Filter
+          </button>
         </div>
       </div>
 
@@ -4460,7 +5731,7 @@ function renderWorkHistory() {
                 ${workHistoryColumns.phone.visible ? `<th class="text-left">Phone</th>` : ''}
                 ${workHistoryColumns.email.visible ? `<th class="text-left">Email</th>` : ''}
                 ${workHistoryColumns.loanAmount.visible ? `<th class="text-left">Loan Amount</th>` : ''}
-                ${workHistoryColumns.loanType.visible ? `<th class="text-left">Loan Type</th>` : ''}
+                ${workHistoryColumns.loanType.visible ? `<th class="text-left">Product Type</th>` : ''}
                 ${workHistoryColumns.leadStatus.visible ? `<th class="text-left">Lead Status</th>` : ''}
                 ${workHistoryColumns.priority.visible ? `<th class="text-left">Priority</th>` : ''}
                 ${workHistoryColumns.aging.visible ? `<th class="text-left">Aging</th>` : ''}
@@ -4470,7 +5741,7 @@ function renderWorkHistory() {
               </tr>
             </thead>
             <tbody id="workHistoryTableBody">
-              ${list.length === 0 ? `
+              ${paginatedList.length === 0 ? `
                 <tr>
                   <td colspan="${visibleColsCount}" class="text-center py-12 text-surface-500">
                     <div class="flex flex-col items-center justify-center">
@@ -4480,7 +5751,7 @@ function renderWorkHistory() {
                     </div>
                   </td>
                 </tr>
-              ` : list.map(c => {
+              ` : paginatedList.map(c => {
                 const lead = leads.find(l => l.id === c.lead_id || l._id === c.lead_id);
                 const agent = getUser(c.agent_id);
                 
@@ -4490,6 +5761,12 @@ function renderWorkHistory() {
                 const leadStatus = lead ? `<span class="badge ${getStatusBadgeClass(lead.status)}">${STATUS_LABELS[lead.status] || lead.status}</span>` : '—';
                 const loanType = lead ? (LOAN_LABELS[lead.loan_type] || lead.loan_type || '—') : '—';
                 
+                const deleteAction = (APP.currentRole === 'admin' || APP.currentRole === 'tl') ? `
+                  <button class="btn btn-ghost btn-xs text-rose-500 hover:text-rose-400" onclick="deleteCallHistoryRecord('${c.id || c._id}')" title="Delete record">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                ` : '';
+
                 const leadPriorityVal = lead ? (lead.priority || 'cold').toLowerCase().trim() : 'cold';
                 let priorityBadgeClass = 'badge-contacted'; // cold
                 if (leadPriorityVal === 'hot') priorityBadgeClass = 'badge-hot';
@@ -4501,16 +5778,17 @@ function renderWorkHistory() {
                 const team = getTeam(teamId);
                 const teamName = team ? team.name : '—';
                 
-                const formattedTime = new Date(c.created_at).toLocaleString('en-US', {
+                const formattedTime = new Date(c.created_at).toLocaleString('en-IN', {
                   month: 'short',
                   day: 'numeric',
                   year: 'numeric',
                   hour: '2-digit',
-                  minute: '2-digit'
+                  minute: '2-digit',
+                  timeZone: 'Asia/Kolkata'
                 });
 
                 const outcomeBadge = `<span class="badge ${getOutcomeBadgeClass(c.outcome)}">${OUTCOME_LABELS[c.outcome] || c.outcome}</span>`;
-                const followUpBadge = c.follow_up_at ? `<span class="badge badge-documents-pending"><i class="fas fa-calendar-alt mr-1 text-[10px]"></i> ${new Date(c.follow_up_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>` : '—';
+                const followUpBadge = c.follow_up_at ? `<span class="badge badge-documents-pending"><i class="fas fa-calendar-alt mr-1 text-[10px]"></i> ${formatDateTime(c.follow_up_at)}</span>` : '—';
                 
                 return `
                   <tr class="hover:bg-surface-800/30">
@@ -4533,6 +5811,16 @@ function renderWorkHistory() {
               }).join('')}
             </tbody>
           </table>
+        </div>
+        <!-- Pagination -->
+        <div class="flex items-center justify-between p-4 border-t border-surface-800">
+            <span class="text-sm text-surface-400">Page ${APP.workHistoryPage} of ${totalPages}</span>
+            <div class="flex gap-2">
+                <button class="btn btn-secondary btn-sm ${APP.workHistoryPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}" 
+                    onclick="if(APP.workHistoryPage > 1) changeWorkHistoryPage(-1)" ${APP.workHistoryPage === 1 ? 'disabled' : ''}>Back</button>
+                <button class="btn btn-secondary btn-sm ${APP.workHistoryPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}" 
+                    onclick="if(APP.workHistoryPage < ${totalPages}) changeWorkHistoryPage(1)" ${APP.workHistoryPage === totalPages ? 'disabled' : ''}>Next</button>
+            </div>
         </div>
       </div>
     </div>
@@ -4644,10 +5932,25 @@ async function handleMemberSubmit(e) {
   }
 }
 
+function populateCategorySelect(selectedId) {
+  const sel = document.getElementById('leadCategory');
+  if (sel) {
+    sel.innerHTML = LEAD_CATEGORIES.map(c => `<option value="${c}" ${c === selectedId ? 'selected' : (!selectedId && (c === 'individual' || c === 'Individual') ? 'selected' : '')}>${CATEGORY_LABELS[c] || c}</option>`).join('');
+  }
+}
+
+function populateCitySelect(selectedId) {
+  const sel = document.getElementById('leadCity');
+  if (sel) {
+    const sortedCities = [...CITIES].sort((a, b) => (CITY_LABELS[a] || a).localeCompare(CITY_LABELS[b] || b));
+    sel.innerHTML = '<option value="">Select City...</option>' + sortedCities.map(c => `<option value="${c}" ${c === selectedId ? 'selected' : ''}>${CITY_LABELS[c] || c}</option>`).join('');
+  }
+}
+
 function populateLoanTypeSelect(selectedId) {
   const sel = document.getElementById('leadLoanType');
   if (sel) {
-    sel.innerHTML = '<option value="">Select loan type</option>' + LOAN_TYPES.map(lt => `<option value="${lt}" ${lt === selectedId ? 'selected' : ''}>${LOAN_LABELS[lt] || lt}</option>`).join('');
+    sel.innerHTML = '<option value="">Select product type</option>' + LOAN_TYPES.map(lt => `<option value="${lt}" ${lt === selectedId ? 'selected' : ''}>${LOAN_LABELS[lt] || lt}</option>`).join('');
   }
 }
 
@@ -4700,6 +6003,7 @@ function showAddLeadModal() {
   document.getElementById('duplicateWarning').classList.add('hidden');
   document.getElementById('leadDeleteBtn').classList.add('hidden');
   populateAgentSelect();
+  populateCategorySelect();
   populateLoanTypeSelect();
   populateSourceSelect();
   populateStatusSelect();
@@ -4716,7 +6020,8 @@ function showEditLeadModal(id) {
   document.getElementById('leadName').value = lead.name;
   document.getElementById('leadPhone').value = lead.phone;
   document.getElementById('leadEmail').value = lead.email || '';
-  document.getElementById('leadCity').value = lead.city || '';
+  populateCitySelect(lead.city);
+  populateCategorySelect(lead.lead_category);
   populateLoanTypeSelect(lead.loan_type);
   document.getElementById('leadAmount').value = lead.amount_requested;
   populateSourceSelect(lead.source);
@@ -4750,8 +6055,8 @@ function showAddLoanTypeModal() {
   document.getElementById('loanTypeEditKey').value = '';
   document.getElementById('loanTypeForm').reset();
   document.getElementById('loanTypeKey').disabled = false;
-  document.getElementById('loanTypeModalTitle').textContent = 'Add Loan Type';
-  document.getElementById('loanTypeSubmitBtn').textContent = 'Add Loan Type';
+  document.getElementById('loanTypeModalTitle').textContent = 'Add Product Type';
+  document.getElementById('loanTypeSubmitBtn').textContent = 'Add Product Type';
   openModal('addLoanTypeModal');
 }
 
@@ -4761,7 +6066,7 @@ function showEditLoanTypeModal(key) {
   document.getElementById('loanTypeKey').value = key;
   document.getElementById('loanTypeKey').disabled = true;
   document.getElementById('loanTypeName').value = label;
-  document.getElementById('loanTypeModalTitle').textContent = 'Edit Loan Type';
+  document.getElementById('loanTypeModalTitle').textContent = 'Edit Product Type';
   document.getElementById('loanTypeSubmitBtn').textContent = 'Save Changes';
   openModal('addLoanTypeModal');
 }
@@ -4773,7 +6078,7 @@ async function handleLoanTypeSubmit(e) {
   const name = document.getElementById('loanTypeName').value.trim();
 
   if (!key) {
-    toast('Invalid loan type key', 'error');
+    toast('Invalid product type key', 'error');
     return;
   }
 
@@ -4787,7 +6092,7 @@ async function handleLoanTypeSubmit(e) {
       LOAN_LABELS[editKey] = name;
     } else {
       if (LOAN_TYPES.includes(key)) {
-        toast('Loan Type code already exists', 'error');
+        toast('Product Type code already exists', 'error');
         return;
       }
       LOAN_TYPES.push(key);
@@ -4798,7 +6103,7 @@ async function handleLoanTypeSubmit(e) {
       fetchAPI('/settings/loan_types', { method: 'POST', body: JSON.stringify({ value: LOAN_TYPES }) }),
       fetchAPI('/settings/loan_labels', { method: 'POST', body: JSON.stringify({ value: LOAN_LABELS }) })
     ]);
-    toast(editKey ? 'Loan Type updated successfully' : 'Loan Type added successfully');
+    toast(editKey ? 'Product Type updated successfully' : 'Product Type added successfully');
     closeModal('addLoanTypeModal');
     renderPage();
   } catch (err) {
@@ -4811,17 +6116,17 @@ async function handleLoanTypeSubmit(e) {
 
 async function deleteLoanType(key) {
   if (LOAN_TYPES.length <= 1) {
-    toast('Cannot delete the last remaining loan type', 'error');
+    toast('Cannot delete the last remaining product type', 'error');
     return;
   }
   
   const leadUsing = leads.some(l => l.loan_type === key);
   if (leadUsing) {
-    toast('Cannot delete: Loan type is currently assigned to one or more leads.', 'error');
+    toast('Cannot delete: Product type is currently assigned to one or more leads.', 'error');
     return;
   }
 
-  showConfirmModal('Delete Loan Type', `Are you sure you want to delete ${LOAN_LABELS[key] || key}?`, async () => {
+  showConfirmModal('Delete Product Type', `Are you sure you want to delete ${LOAN_LABELS[key] || key}?`, async () => {
     try {
       const index = LOAN_TYPES.indexOf(key);
       if (index > -1) {
@@ -4831,7 +6136,7 @@ async function deleteLoanType(key) {
           fetchAPI('/settings/loan_types', { method: 'POST', body: JSON.stringify({ value: LOAN_TYPES }) }),
           fetchAPI('/settings/loan_labels', { method: 'POST', body: JSON.stringify({ value: LOAN_LABELS }) })
         ]);
-        toast('Loan Type deleted successfully');
+        toast('Product Type deleted successfully');
         renderPage();
       }
     } catch (err) {
@@ -4931,6 +6236,191 @@ async function deleteLeadStatus(key) {
       }
     } catch (err) {
       initApp();
+    }
+  });
+}
+
+// --- City Modals and Actions ---
+function showAddCityModal() {
+  document.getElementById('cityEditKey').value = '';
+  document.getElementById('cityForm').reset();
+  document.getElementById('cityKey').disabled = false;
+  document.getElementById('cityModalTitle').textContent = 'Add City';
+  document.getElementById('citySubmitBtn').textContent = 'Add City';
+  openModal('addCityModal');
+}
+
+function showEditCityModal(key) {
+  const label = CITY_LABELS[key] || key;
+  document.getElementById('cityEditKey').value = key;
+  document.getElementById('cityKey').value = key;
+  document.getElementById('cityKey').disabled = true;
+  document.getElementById('cityName').value = label;
+  document.getElementById('cityModalTitle').textContent = 'Edit City';
+  document.getElementById('citySubmitBtn').textContent = 'Save Changes';
+  openModal('addCityModal');
+}
+
+async function handleCitySubmit(e) {
+  e.preventDefault();
+  const editKey = document.getElementById('cityEditKey').value;
+  let key = document.getElementById('cityKey').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+  const name = document.getElementById('cityName').value.trim();
+
+  if (!key || !name) {
+    toast('Key and Name are required', 'error');
+    return;
+  }
+
+  try {
+    if (editKey) {
+      CITY_LABELS[editKey] = name;
+    } else {
+      if (CITIES.includes(key)) {
+        toast('City key already exists', 'error');
+        return;
+      }
+      CITIES.push(key);
+      CITY_LABELS[key] = name;
+    }
+
+    await Promise.all([
+      fetchAPI('/settings/cities', { method: 'POST', body: JSON.stringify({ value: CITIES }) }),
+      fetchAPI('/settings/city_labels', { method: 'POST', body: JSON.stringify({ value: CITY_LABELS }) })
+    ]);
+    
+    toast(editKey ? 'City updated successfully' : 'City added successfully');
+    closeModal('addCityModal');
+    renderPage();
+  } catch (err) {
+    console.error('Error saving city:', err);
+    toast('Failed to save city', 'error');
+  }
+}
+
+function deleteCity(key) {
+  const leadUsing = leads.some(l => l.city && l.city.toLowerCase() === key);
+  if (leadUsing) {
+    toast('Cannot delete: City is currently assigned to one or more leads.', 'error');
+    return;
+  }
+
+  showConfirmModal('Delete City', `Are you sure you want to delete ${CITY_LABELS[key] || key}?`, async () => {
+    try {
+      const index = CITIES.indexOf(key);
+      if (index > -1) {
+        CITIES.splice(index, 1);
+        delete CITY_LABELS[key];
+        await Promise.all([
+          fetchAPI('/settings/cities', { method: 'POST', body: JSON.stringify({ value: CITIES }) }),
+          fetchAPI('/settings/city_labels', { method: 'POST', body: JSON.stringify({ value: CITY_LABELS }) })
+        ]);
+        toast('City deleted successfully');
+        renderPage();
+      }
+    } catch (err) {
+      console.error('Error deleting city:', err);
+      toast('Failed to delete city', 'error');
+    }
+  });
+}
+
+// --- Lead Category Modals and Actions ---
+function showAddLeadCategoryModal() {
+  document.getElementById('leadCategoryEditKey').value = '';
+  document.getElementById('leadCategoryForm').reset();
+  document.getElementById('leadCategoryKey').disabled = false;
+  document.getElementById('leadCategoryModalTitle').textContent = 'Add Lead Category';
+  document.getElementById('leadCategorySubmitBtn').textContent = 'Add Lead Category';
+  openModal('addLeadCategoryModal');
+}
+
+function showEditLeadCategoryModal(key) {
+  const label = CATEGORY_LABELS[key] || key;
+  document.getElementById('leadCategoryEditKey').value = key;
+  document.getElementById('leadCategoryKey').value = key;
+  document.getElementById('leadCategoryKey').disabled = true;
+  document.getElementById('leadCategoryName').value = label;
+  document.getElementById('leadCategoryModalTitle').textContent = 'Edit Lead Category';
+  document.getElementById('leadCategorySubmitBtn').textContent = 'Save Changes';
+  openModal('addLeadCategoryModal');
+}
+
+async function handleLeadCategorySubmit(e) {
+  e.preventDefault();
+  const editKey = document.getElementById('leadCategoryEditKey').value;
+  const key = document.getElementById('leadCategoryKey').value.trim().toLowerCase().replace(/\s+/g, '_');
+  const name = document.getElementById('leadCategoryName').value.trim();
+
+  if (!key) {
+    toast('Invalid category key', 'error');
+    return;
+  }
+  
+  const btn = e.submitter;
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  try {
+    if (editKey) {
+      CATEGORY_LABELS[editKey] = name;
+    } else {
+      if (LEAD_CATEGORIES.includes(key)) {
+        toast('Lead Category key already exists', 'error');
+        return;
+      }
+      LEAD_CATEGORIES.push(key);
+      CATEGORY_LABELS[key] = name;
+    }
+
+    await Promise.all([
+      fetchAPI('/settings/lead_categories', { method: 'POST', body: JSON.stringify({ value: LEAD_CATEGORIES }) }),
+      fetchAPI('/settings/lead_category_labels', { method: 'POST', body: JSON.stringify({ value: CATEGORY_LABELS }) })
+    ]);
+    
+    toast(editKey ? 'Lead Category updated successfully' : 'Lead Category added successfully');
+    closeModal('addLeadCategoryModal');
+    renderPage();
+  } catch (err) {
+    console.error('Error saving lead category:', err);
+    toast('Failed to save lead category', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+    }
+  }
+}
+
+async function deleteLeadCategory(key) {
+  if (LEAD_CATEGORIES.length <= 1) {
+    toast('Cannot delete the last remaining lead category', 'error');
+    return;
+  }
+
+  const leadUsing = leads.some(l => (l.lead_category || 'individual').toLowerCase().trim() === key.toLowerCase().trim());
+  if (leadUsing) {
+    toast('Cannot delete: Category is currently assigned to one or more leads.', 'error');
+    return;
+  }
+
+  showConfirmModal('Delete Lead Category', `Are you sure you want to delete ${CATEGORY_LABELS[key] || key}?`, async () => {
+    try {
+      const index = LEAD_CATEGORIES.indexOf(key);
+      if (index > -1) {
+        LEAD_CATEGORIES.splice(index, 1);
+        delete CATEGORY_LABELS[key];
+        await Promise.all([
+          fetchAPI('/settings/lead_categories', { method: 'POST', body: JSON.stringify({ value: LEAD_CATEGORIES }) }),
+          fetchAPI('/settings/lead_category_labels', { method: 'POST', body: JSON.stringify({ value: CATEGORY_LABELS }) })
+        ]);
+        toast('Lead Category deleted successfully');
+        renderPage();
+      }
+    } catch (err) {
+      console.error('Error deleting lead category:', err);
+      toast('Failed to delete lead category', 'error');
     }
   });
 }
@@ -5563,6 +7053,7 @@ async function handleLeadSubmit(e) {
   const phone = document.getElementById('leadPhone').value.trim();
   const email = document.getElementById('leadEmail').value.trim();
   const city = document.getElementById('leadCity').value.trim();
+  const category = document.getElementById('leadCategory').value;
   const loanType = document.getElementById('leadLoanType').value;
   const amount = parseInt(document.getElementById('leadAmount').value);
   const source = document.getElementById('leadSource').value;
@@ -5579,6 +7070,7 @@ async function handleLeadSubmit(e) {
   try {
     const payload = {
       name, phone, email, city,
+      lead_category: category,
       loan_type: loanType,
       amount_requested: amount,
       source, status, priority, notes,
@@ -5717,6 +7209,13 @@ async function handleCallLogSubmit(e) {
   }
 }
 
+function navigateToLeadFollowUps(leadId) {
+  APP.followUpLeadFilter = leadId;
+  APP.currentPage = 'followups';
+  APP.currentFollowUpView = 'table';
+  renderPage();
+}
+
 async function showLeadDetail(id) {
   const lead = leads.find(l => l.id === id || l._id === id);
   if (!lead) return;
@@ -5744,7 +7243,10 @@ async function showLeadDetail(id) {
         <div class="flex items-center gap-3">
           <div class="w-11 h-11 rounded-full bg-brand-600/20 flex items-center justify-center"><span class="text-lg font-bold text-brand-400">${lead.name.charAt(0)}</span></div>
           <div>
-            <h3 class="font-display font-bold text-lg text-white">${lead.name}</h3>
+            <div class="flex items-center gap-2">
+              <h3 class="font-display font-bold text-lg text-white">${lead.name}</h3>
+              ${lead.lead_uid ? `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-surface-800 text-surface-400 border border-surface-700">${lead.lead_uid}</span>` : ''}
+            </div>
             <p class="text-sm text-surface-400">${lead.city} — ${LOAN_LABELS[lead.loan_type] || lead.loan_type}</p>
           </div>
         </div>
@@ -5800,6 +7302,7 @@ async function showLeadDetail(id) {
                       <span class="text-[10px] text-surface-500">${formatDateTime(c.created_at)}</span>
                     </div>
                     ${c.notes ? `<p class="text-[11px] text-surface-400 leading-tight">${c.notes}</p>` : ''}
+                    ${c.follow_up_at ? `<p class="text-[10px] text-amber-400 mt-1 font-medium"><i class="fas fa-calendar-alt mr-1"></i> Follow-up: ${formatDateTime(c.follow_up_at)}</p>` : ''}
                   </div>
                 `).join('')}
               </div>
@@ -5949,7 +7452,7 @@ function handleDragOver(e) {
   const zone = document.getElementById('csvDropZone');
   if (zone) {
     zone.classList.remove('border-surface-700');
-    zone.classList.add('border-brand-500', 'bg-brand-600/5');
+    zone.classList.add('border-[#4285F4]', 'bg-[#4285F4]/5');
   }
 }
 
@@ -5958,7 +7461,7 @@ function handleDragLeave(e) {
   e.stopPropagation();
   const zone = document.getElementById('csvDropZone');
   if (zone) {
-    zone.classList.remove('border-brand-500', 'bg-brand-600/5');
+    zone.classList.remove('border-[#4285F4]', 'bg-[#4285F4]/5');
     zone.classList.add('border-surface-700');
   }
 }
@@ -5968,7 +7471,7 @@ function handleCSVDrop(e) {
   e.stopPropagation();
   const zone = document.getElementById('csvDropZone');
   if (zone) {
-    zone.classList.remove('border-brand-500', 'bg-brand-600/5');
+    zone.classList.remove('border-[#4285F4]', 'bg-[#4285F4]/5');
     zone.classList.add('border-surface-700');
   }
   
@@ -6023,21 +7526,32 @@ function handleCSVImport(e) {
     document.getElementById('importPreview').classList.remove('hidden');
     document.getElementById('importTable').innerHTML = `
       <table class="data-table">
-        <thead><tr><th>Name</th><th>Phone</th><th>City</th><th>Email</th><th>Status</th><th>Loan Type</th><th>Amount</th><th>Source</th></tr></thead>
+        <thead><tr><th>Name</th><th>Phone</th><th>City</th><th>Category</th><th>Email</th><th>Status</th><th>Product Type</th><th>Amount</th><th>Source</th></tr></thead>
         <tbody>${importData.slice(0, 10).map(r => `<tr>
           <td class="text-white">${r.name || '—'}</td>
           <td>${r.phone || '—'}</td>
           <td>${r.city || '—'}</td>
+          <td>${r.category || r.leadcategory || '—'}</td>
           <td>${r.email || '—'}</td>
           <td>${r.status || '—'}</td>
-          <td>${r.loantype || '—'}</td>
+          <td>${r.producttype || r.loantype || '—'}</td>
           <td>${r.amount ? formatCurrency(r.amount) : '—'}</td>
           <td>${r.source || '—'}</td>
-        </tr>`).join('')}${importData.length > 10 ? `<tr><td colspan="8" class="text-center text-surface-500">...and ${importData.length - 10} more</td></tr>` : ''}</tbody>
+        </tr>`).join('')}${importData.length > 10 ? `<tr><td colspan="9" class="text-center text-surface-500">...and ${importData.length - 10} more</td></tr>` : ''}</tbody>
       </table>
     `;
   };
   reader.readAsText(file);
+}
+
+function clearImportSelection() {
+  const input = document.getElementById('csvInput');
+  if (input) input.value = '';
+  const preview = document.getElementById('importPreview');
+  if (preview) preview.classList.add('hidden');
+  const count = document.getElementById('importCount');
+  if (count) count.textContent = '0';
+  importData = [];
 }
 
 async function confirmImport() {
@@ -6046,65 +7560,110 @@ async function confirmImport() {
 }
 
 async function performImport(confirm) {
+  let importProgressInterval;
+  let currentProgress = 0;
+  const totalLeads = importData.length;
+  
+  if (!confirm) {
+    showProgressUI('Importing Leads', `Importing 0 of ${totalLeads}...`);
+  } else {
+    showProgressUI('Importing New Leads', `Processing...`);
+  }
+  
+  importProgressInterval = setInterval(() => {
+    if (currentProgress < 90) {
+      currentProgress += (Math.random() * 15) + 5;
+      if (currentProgress > 90) currentProgress = 90;
+      const currentCount = Math.floor((currentProgress / 100) * totalLeads);
+      updateProgressUI(currentProgress, `Importing ${currentCount} of ${totalLeads}...`);
+    }
+  }, 400);
+
   try {
     const res = await fetchAPI('/leads/import', {
       method: 'POST',
       body: JSON.stringify({ leads: importData, confirm })
     });
 
+    clearInterval(importProgressInterval);
+
     if (res.status === 'duplicate_found') {
-      const modal = document.getElementById('confirmModal');
-      modal.querySelector('.p-6').innerHTML = `
-        <div class="flex items-center gap-4 mb-4">
-          <div class="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
-            <i class="fas fa-exclamation-triangle text-xl text-orange-500"></i>
+      hideProgressUI();
+      let modal = document.getElementById('duplicateImportModal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'duplicateImportModal';
+        modal.className = 'modal-overlay';
+        document.body.appendChild(modal);
+      }
+      modal.innerHTML = `
+        <div class="modal" style="max-width:400px">
+          <div class="p-6">
+            <h3 class="font-display font-bold text-white text-xl mb-4">Import Summary</h3>
+            <div class="bg-surface-900 rounded-xl p-4 mb-6 border border-surface-800">
+              <div class="flex justify-between items-center mb-3">
+                <span class="text-surface-400">Total Leads</span>
+                <span class="font-bold text-white">${res.duplicatesCount + res.newLeadsCount}</span>
+              </div>
+              <div class="flex justify-between items-center mb-3">
+                <span class="text-surface-400">New / Unique</span>
+                <span class="font-bold text-brand-400">${res.newLeadsCount}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-surface-400">Duplicates</span>
+                <span class="font-bold text-amber-400">${res.duplicatesCount}</span>
+              </div>
+            </div>
+            <p class="text-surface-300 text-sm mb-6">Would you like to proceed and import only the ${res.newLeadsCount} new leads?</p>
+            <div class="flex justify-end gap-3">
+              <button class="btn btn-secondary" onclick="closeModal('duplicateImportModal')">Cancel</button>
+              <button class="btn btn-primary" onclick="performImport(true); closeModal('duplicateImportModal')">Import ${res.newLeadsCount} New</button>
+            </div>
           </div>
-          <div>
-            <h3 class="font-bold text-white text-lg">Duplicates Found</h3>
-            <p class="text-surface-400 text-sm">${res.duplicatesCount} leads are already in the system. Would you like to import the ${res.newLeadsCount} new leads?</p>
-          </div>
-        </div>
-        <div class="flex justify-end gap-3 mt-6">
-          <button class="btn-ghost" onclick="closeModal('confirmModal')">Cancel</button>
-          <button class="btn-primary bg-orange-600 hover:bg-orange-700" onclick="performImport(true); closeModal('confirmModal')">Import Only New</button>
         </div>
       `;
-      openModal('confirmModal');
+      openModal('duplicateImportModal');
       return;
     }
     
-    toast(`${res.imported} leads imported successfully. ${res.failed} failed.`);
-    if (res.errors && res.errors.length > 0) {
-        const errorList = document.getElementById('importErrorsList');
-        errorList.innerHTML = res.errors.map(err => `<p class="text-red-400">${err}</p>`).join('');
-        openModal('importErrorsModal');
-    }
-    
-    importData = [];
-    closeModal('importModal');
-    document.getElementById('importPreview').classList.add('hidden');
-    const fileInput = document.getElementById('csvInput');
-    if (fileInput) fileInput.value = '';
-    renderPage();
-    updateUserUI();
+    updateProgressUI(100, 'Done!');
+    setTimeout(() => {
+      hideProgressUI();
+      toast(`${res.imported} leads imported successfully. ${res.failed} failed.`);
+      if (res.errors && res.errors.length > 0) {
+          const errorList = document.getElementById('importErrorsList');
+          errorList.innerHTML = res.errors.map(err => `<p class="text-red-400">${err}</p>`).join('');
+          openModal('importErrorsModal');
+      }
+      
+      importData = [];
+      closeModal('importModal');
+      document.getElementById('importPreview').classList.add('hidden');
+      const fileInput = document.getElementById('csvInput');
+      if (fileInput) fileInput.value = '';
+      renderPage();
+      updateUserUI();
+    }, 400);
   } catch (err) {
+    clearInterval(importProgressInterval);
+    hideProgressUI();
     toast('Import failed: ' + err.message, 'error');
   }
 }
 
 // ========== EXPORT ==========
 function downloadCSVTemplate() {
-  const templateCSV = `Name,Phone,Email,City,Loan Type,Amount,Source,Status
-Aarav Sharma,9876543210,aarav.sharma@email.com,Mumbai,home_loan,5000000,facebook,new
-Priya Patel,9123456789,priya.patel@email.com,Delhi,personal_loan,200000,website,new
-Rohan Gupta,9988776655,rohan.gupta@email.com,Bangalore,car_loan,800000,referral,new
-Sneha Singh,9876501234,sneha.singh@email.com,Hyderabad,business_loan,1500000,website,new
-Amit Verma,9112233445,amit.verma@email.com,Chennai,home_loan,3000000,google,new
-Megha Reddy,9001122334,megha.reddy@email.com,Pune,personal_loan,500000,facebook,new
-Vikram Iyer,9887766554,vikram.iyer@email.com,Kolkata,education_loan,1000000,website,new
-Anjali Das,9776655443,anjali.das@email.com,Ahmedabad,car_loan,700000,google,new
-Rahul Kumar,9665544332,rahul.kumar@email.com,Jaipur,personal_loan,300000,referral,new
-Sonia Rao,9554433221,sonia.rao@email.com,Lucknow,home_loan,4000000,facebook,new`;
+  const templateCSV = `Name,Phone,Email,City,Category,Product Type,Amount,Source,Status
+Aarav Sharma,9876543210,aarav.sharma@email.com,mumbai,individual,home_loan,5000000,facebook,new
+Priya Patel,9123456789,priya.patel@email.com,delhi,business,personal_loan,200000,website,new
+Rohan Gupta,9988776655,rohan.gupta@email.com,bangalore,individual,car_loan,800000,referral,new
+Sneha Singh,9876501234,sneha.singh@email.com,hyderabad,business,business_loan,1500000,website,new
+Amit Verma,9112233445,amit.verma@email.com,chennai,individual,home_loan,3000000,google,new
+Megha Reddy,9001122334,megha.reddy@email.com,pune,individual,personal_loan,500000,facebook,new
+Vikram Iyer,9887766554,vikram.iyer@email.com,kolkata,individual,education_loan,1000000,website,new
+Anjali Das,9776655443,anjali.das@email.com,ahmedabad,business,car_loan,700000,google,new
+Rahul Kumar,9665544332,rahul.kumar@email.com,jaipur,individual,personal_loan,300000,referral,new
+Sonia Rao,9554433221,sonia.rao@email.com,lucknow,individual,home_loan,4000000,facebook,new`;
 
   const blob = new Blob([templateCSV], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -6117,14 +7676,46 @@ Sonia Rao,9554433221,sonia.rao@email.com,Lucknow,home_loan,4000000,facebook,new`
   document.body.removeChild(a);
 }
 
+function exportFollowUpsCSV() {
+  const followUps = getAllFollowUps();
+  if (followUps.length === 0) {
+    alert('No follow ups to export');
+    return;
+  }
+
+  const headers = ['Lead Name', 'Phone', 'Status', 'Priority', 'Call Output', 'Notes', 'Follow Up Time', 'Status'];
+  const rows = followUps.map(f => [
+    `"${f.leadName}"`,
+    f.leadPhone,
+    STATUS_LABELS[f.leadStatus] || f.leadStatus,
+    PRIORITY_LABELS[f.leadPriority] || f.leadPriority,
+    OUTCOME_LABELS[f.outcome] || f.outcome,
+    `"${(f.notes || '').replace(/"/g, '""')}"`,
+    formatDateTime(f.follow_up_at),
+    f.follow_up_status
+  ]);
+
+  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `follow_ups_${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 function exportLeadsCSV(selectedOnly = false) {
   const vl = selectedOnly ? leads.filter(l => selectedLeadIds.includes(l.id || l._id)) : getFilteredLeads();
-  let csv = 'Name,Phone,Email,City,Loan Type,Amount,Source,Status,Agent,Aging,Assigned At,Created At\n';
+  let csv = 'Name,Phone,Email,City,Category,Product Type,Amount,Source,Status,Agent,Aging,Assigned At,Created At\n';
   vl.forEach(l => {
     const escapedName = (l.name || '').replace(/"/g, '""');
     const escapedPhone = (l.phone || '').replace(/"/g, '""');
     const escapedEmail = (l.email || '').replace(/"/g, '""');
     const escapedCity = (l.city || '').replace(/"/g, '""');
+    const escapedCategory = (CATEGORY_LABELS[l.lead_category] || l.lead_category || 'Individual').replace(/"/g, '""');
     const escapedLoanType = (LOAN_LABELS[l.loan_type] || l.loan_type || '').replace(/"/g, '""');
     const escapedAmount = l.amount_requested || 0;
     const escapedSource = (l.source || '').replace(/"/g, '""');
@@ -6134,7 +7725,7 @@ function exportLeadsCSV(selectedOnly = false) {
     const assignedAt = formatDate(l.assigned_at);
     const createdAt = formatDate(l.created_at);
     
-    csv += `"${escapedName}","${escapedPhone}","${escapedEmail}","${escapedCity}","${escapedLoanType}","${escapedAmount}","${escapedSource}","${escapedStatus}","${escapedAgentName}","${aging}","${assignedAt}","${createdAt}"\n`;
+    csv += `"${escapedName}","${escapedPhone}","${escapedEmail}","${escapedCity}","${escapedCategory}","${escapedLoanType}","${escapedAmount}","${escapedSource}","${escapedStatus}","${escapedAgentName}","${aging}","${assignedAt}","${createdAt}"\n`;
   });
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -6335,7 +7926,7 @@ function generateNotifications() {
           list.push({
             id: 'notif_conv_' + l.id,
             type: 'conversion',
-            message: `Lead successfully disbursed: <strong>${l.name}</strong> (Amount: ₹${l.amount_requested?.toLocaleString() || l.amount_requested})`,
+            message: `Lead successfully disbursed: <strong>${l.name}</strong> (Amount: ₹${l.amount_requested?.toLocaleString('en-IN') || l.amount_requested})`,
             time: l.updated_at || l.created_at,
             read: false
           });

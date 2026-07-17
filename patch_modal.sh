@@ -1,0 +1,43 @@
+#!/bin/bash
+cat << 'INNEREOF' > patch.txt
+--- Index.html
++++ Index.html
+@@ -7248,19 +7248,22 @@
+       }
+       modal.innerHTML = \`
+         <div class="modal" style="max-width:400px">
+           <div class="p-6">
+-            <div class="flex items-center gap-4 mb-4">
+-              <div class="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+-                <i class="fas fa-exclamation-triangle text-xl text-orange-500"></i>
+-              </div>
+-              <div>
+-                <h3 class="font-bold text-white text-lg">Duplicates Found</h3>
+-                <p class="text-surface-400 text-sm">\${res.duplicatesCount} leads are already in the system. Would you like to import the \${res.newLeadsCount} new leads?</p>
+-              </div>
++            <h3 class="font-display font-bold text-white text-xl mb-4">Import Summary</h3>
++            <div class="bg-surface-900 rounded-xl p-4 mb-6 border border-surface-800">
++              <div class="flex justify-between items-center mb-3">
++                <span class="text-surface-400">Total Leads</span>
++                <span class="font-bold text-white">\${res.duplicatesCount + res.newLeadsCount}</span>
++              </div>
++              <div class="flex justify-between items-center mb-3">
++                <span class="text-surface-400">New / Unique</span>
++                <span class="font-bold text-brand-400">\${res.newLeadsCount}</span>
++              </div>
++              <div class="flex justify-between items-center">
++                <span class="text-surface-400">Duplicates</span>
++                <span class="font-bold text-amber-400">\${res.duplicatesCount}</span>
++              </div>
+             </div>
+-            <div class="flex justify-end gap-3 mt-6">
+-              <button class="btn-ghost" onclick="closeModal('duplicateImportModal')">Cancel</button>
+-              <button class="btn-primary bg-orange-600 hover:bg-orange-700" onclick="performImport(true); closeModal('duplicateImportModal')">Import Only New</button>
++            <p class="text-surface-300 text-sm mb-6">Would you like to proceed and import only the \${res.newLeadsCount} new leads?</p>
++            <div class="flex justify-end gap-3">
++              <button class="btn btn-secondary" onclick="closeModal('duplicateImportModal')">Cancel</button>
++              <button class="btn btn-primary" onclick="performImport(true); closeModal('duplicateImportModal')">Import \${res.newLeadsCount} New</button>
+             </div>
+           </div>
+INNEREOF
+patch Index.html < patch.txt
