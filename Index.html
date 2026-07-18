@@ -582,7 +582,7 @@ body.light-theme #loginOverlay > div {
       </div>
       <div>
         <label class="block text-sm font-medium text-surface-400 mb-1.5">Email *</label>
-        <input type="email" class="form-input" id="memberEmail" required placeholder="anita@paisaneed.com">
+        <input type="email" class="form-input" id="memberEmail" required>
       </div>
       <div>
         <label class="block text-sm font-medium text-surface-400 mb-1.5">Role *</label>
@@ -603,7 +603,7 @@ body.light-theme #loginOverlay > div {
       <div>
         <label class="block text-sm font-medium text-surface-400 mb-1.5" id="memberPasswordLabel">Password *</label>
         <div class="relative">
-          <input type="password" class="form-input pr-10" id="memberPassword" required placeholder="Min 6 characters (e.g. Paisa@123)">
+          <input type="password" class="form-input pr-10" id="memberPassword" required>
           <button type="button" onclick="togglePasswordVisibility('memberPassword', 'memberPasswordEyeIcon')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-surface-400 hover:text-white transition-colors focus:outline-none">
             <i class="fas fa-eye text-sm" id="memberPasswordEyeIcon"></i>
           </button>
@@ -917,7 +917,7 @@ body.light-theme #loginOverlay > div {
       <div id="csvDropZone" class="border-2 border-dashed border-surface-700 rounded-xl p-10 text-center hover:border-[#4285F4] hover:bg-[#4285F4]/5 transition-all duration-200 cursor-pointer" onclick="document.getElementById('csvInput').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleCSVDrop(event)">
         <i class="fas fa-cloud-upload-alt text-4xl text-surface-500 mb-3"></i>
         <p class="text-white font-medium">Drop CSV file here or click to browse</p>
-        <p class="text-surface-500 text-sm mt-1">Supports .csv files with columns: name, phone, email, city, category, product_type, amount, source, status</p>
+        <p class="text-surface-500 text-sm mt-1">Supports .csv files with columns: name, phone, email, address, city, category, product_type, amount, source, status, notes</p>
       </div>
       <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSVImport(event)">
       <div id="importPreview" class="mt-4 hidden">
@@ -1141,7 +1141,7 @@ const APP = {
   }
 };
 
-let leadsFilter = { status: [], city: [], loanType: [], source: [], agent: [], aging: [], assignment: APP.defaultLeadAssignment, search: '', sort: 'created_at', dir: 'desc', followUp: 'all' };
+let leadsFilter = { status: [], city: [], loanType: [], source: [], agent: [], aging: [], assignment: APP.defaultLeadAssignment, search: '', sort: 'created_at', dir: 'desc', followUp: 'all', dateRange: 'all_time', startDate: '', endDate: '' };
 
 function setTheme(theme) {
   APP.theme = theme;
@@ -1528,8 +1528,71 @@ function buildLeadsUrl() {
     source: leadsFilter.source.join(','),
     agent: leadsFilter.agent.join(','),
     assignment: leadsFilter.assignment,
+    dateRange: leadsFilter.dateRange || 'all_time',
+    startDate: leadsFilter.startDate || '',
+    endDate: leadsFilter.endDate || '',
   });
   return `/leads?${params.toString()}`;
+}
+
+function buildLeadsAllUrl() {
+  const params = new URLSearchParams({
+    assignment: leadsFilter.assignment,
+    dateRange: leadsFilter.dateRange || 'all_time',
+    startDate: leadsFilter.startDate || '',
+    endDate: leadsFilter.endDate || '',
+  });
+  return `/leads/all?${params.toString()}`;
+}
+
+async function saveGlobalDateFilter() {
+  try {
+    await fetchAPI('/settings/global_date_filter', {
+      method: 'POST',
+      body: JSON.stringify({
+        value: {
+          dateRange: leadsFilter.dateRange,
+          startDate: leadsFilter.startDate,
+          endDate: leadsFilter.endDate
+        }
+      })
+    });
+  } catch (err) {
+    console.error('Failed to save global date filter settings:', err);
+  }
+}
+
+async function changeGlobalDateRange(val) {
+  leadsFilter.dateRange = val;
+  APP.currentPaginationPage = 1;
+  await saveGlobalDateFilter();
+  if (APP.currentPage === 'leads') {
+    fetchLeads();
+  } else {
+    renderPage();
+  }
+}
+
+async function changeGlobalStartDate(val) {
+  leadsFilter.startDate = val;
+  APP.currentPaginationPage = 1;
+  await saveGlobalDateFilter();
+  if (APP.currentPage === 'leads') {
+    fetchLeads();
+  } else {
+    renderPage();
+  }
+}
+
+async function changeGlobalEndDate(val) {
+  leadsFilter.endDate = val;
+  APP.currentPaginationPage = 1;
+  await saveGlobalDateFilter();
+  if (APP.currentPage === 'leads') {
+    fetchLeads();
+  } else {
+    renderPage();
+  }
 }
 
 async function fetchLeads() {
@@ -1567,6 +1630,14 @@ async function initApp() {
       APP.currentUserId = user.id;
       APP.currentRole = user.role;
       APP.userName = user.name;
+    }
+
+    // Load persisted global date filter first
+    const globalDateFilterData = await fetchAPI('/settings/global_date_filter').catch(() => null);
+    if (globalDateFilterData && typeof globalDateFilterData === 'object' && !Array.isArray(globalDateFilterData)) {
+      leadsFilter.dateRange = globalDateFilterData.dateRange || 'all_time';
+      leadsFilter.startDate = globalDateFilterData.startDate || '';
+      leadsFilter.endDate = globalDateFilterData.endDate || '';
     }
 
     const [
@@ -1938,11 +2009,50 @@ function getVisibleLeads() {
     const tl = getUser(APP.currentUserId);
     if (!tl) return [];
     return leads.filter(l => {
+      if (!l.assigned_agent_id) return true;
       const agent = getUser(l.assigned_agent_id);
       return agent && agent.team_id === tl.team_id;
     });
   }
   return leads.filter(l => l.assigned_agent_id === APP.currentUserId);
+}
+
+function filterLeadsByDate(list) {
+  if (!leadsFilter.dateRange || leadsFilter.dateRange === 'all_time') return list;
+  
+  const now = new Date();
+  let start = null;
+  let end = null;
+  
+  if (leadsFilter.dateRange === 'this_week') {
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    start = new Date(now.setDate(diff));
+    start.setHours(0,0,0,0);
+  } else if (leadsFilter.dateRange === 'this_month') {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    start.setHours(0,0,0,0);
+  } else if (leadsFilter.dateRange === 'this_year') {
+    start = new Date(now.getFullYear(), 0, 1);
+    start.setHours(0,0,0,0);
+  } else if (leadsFilter.dateRange === 'custom') {
+    if (leadsFilter.startDate) {
+      start = new Date(leadsFilter.startDate);
+      start.setHours(0,0,0,0);
+    }
+    if (leadsFilter.endDate) {
+      end = new Date(leadsFilter.endDate);
+      end.setHours(23,59,59,999);
+    }
+  }
+  
+  return list.filter(l => {
+    if (!l.created_at) return false;
+    const cDate = new Date(l.created_at);
+    if (start && cDate < start) return false;
+    if (end && cDate > end) return false;
+    return true;
+  });
 }
 
 function getStatusBadgeClass(status) {
@@ -1996,7 +2106,7 @@ function navigateTo(page) {
     }
   }
 
-  if (page === 'leads') {
+  if (page === 'leads' || page === 'allocations') {
     fetchLeads();
   } else {
     renderPage();
@@ -2115,7 +2225,7 @@ async function renderPage() {
   if (APP.currentPage === 'dashboard') {
     c.innerHTML = '<div class="text-white">Loading dashboard...</div>';
     try {
-        const allLeads = await fetchAPI('/leads/all');
+        const allLeads = await fetchAPI(buildLeadsAllUrl());
         c.innerHTML = renderDashboard(allLeads);
         initDashboardCharts(allLeads);
     } catch(e) {
@@ -2160,6 +2270,35 @@ function renderAssignmentFilter(extraClass = '') {
       <option value="assigned" class="bg-surface-800 text-white" ${leadsFilter.assignment === 'assigned' ? 'selected' : ''}>Assigned</option>
       <option value="unassigned" class="bg-surface-800 text-white" ${leadsFilter.assignment === 'unassigned' ? 'selected' : ''}>Unassigned</option>
     </select>
+  `;
+}
+
+function renderGlobalDateFilter(extraClass = '') {
+  const colorClass = 'bg-[#4285F4] border-[#4285F4] text-white font-semibold';
+  const selectedRange = leadsFilter.dateRange || 'all_time';
+  
+  let customInputs = '';
+  if (selectedRange === 'custom') {
+    customInputs = `
+      <div class="flex items-center gap-2 ${extraClass}">
+        <input type="date" class="form-input py-1.5 px-2 text-xs bg-surface-900 border-surface-700 text-white rounded w-auto" value="${leadsFilter.startDate || ''}" onchange="changeGlobalStartDate(this.value)">
+        <span class="text-xs text-surface-500">to</span>
+        <input type="date" class="form-input py-1.5 px-2 text-xs bg-surface-900 border-surface-700 text-white rounded w-auto" value="${leadsFilter.endDate || ''}" onchange="changeGlobalEndDate(this.value)">
+      </div>
+    `;
+  }
+  
+  return `
+    <div class="flex items-center gap-2 flex-wrap">
+      <select class="form-input py-2 text-sm w-40 ${colorClass} ${extraClass} transition-all cursor-pointer focus:ring-offset-2 focus:ring-offset-surface-900" onchange="changeGlobalDateRange(this.value)">
+        <option value="this_week" class="bg-surface-800 text-white" ${selectedRange === 'this_week' ? 'selected' : ''}>Current Week</option>
+        <option value="this_month" class="bg-surface-800 text-white" ${selectedRange === 'this_month' ? 'selected' : ''}>Current Month</option>
+        <option value="this_year" class="bg-surface-800 text-white" ${selectedRange === 'this_year' ? 'selected' : ''}>Current Year</option>
+        <option value="custom" class="bg-surface-800 text-white" ${selectedRange === 'custom' ? 'selected' : ''}>Custom Range</option>
+        <option value="all_time" class="bg-surface-800 text-white" ${selectedRange === 'all_time' ? 'selected' : ''}>All Time</option>
+      </select>
+      ${customInputs}
+    </div>
   `;
 }
 
@@ -2438,8 +2577,9 @@ function renderDashboard(allLeads) {
         <div>
           <h2 class="font-display font-bold text-2xl text-white">Dashboard</h2>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
           ${renderAssignmentFilter()}
+          ${renderGlobalDateFilter()}
         </div>
       </div>
 
@@ -2785,6 +2925,7 @@ function initDashboardCharts(allLeads) {
 
 function getFilteredLeads() {
   let vl = getVisibleLeads();
+  vl = filterLeadsByDate(vl);
 
   // Enrich with latest follow-up date
   vl = vl.map(l => {
@@ -2931,12 +3072,13 @@ function renderLeads() {
           ${renderMultiSelect('source', 'Source', [...new Set(leads.map(l => l.source || 'website'))].map(s => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) })))}
           
           ${renderAssignmentFilter()}
+          ${renderGlobalDateFilter()}
 
           ${canManage ? renderMultiSelect('agent', 'Agent', agents.map(a => ({ value: a.id, label: a.name }))) : ''}
           
           ${renderMultiSelect('aging', 'Aging', uniqueAgingDays.map(d => ({ value: String(d), label: `${d} Days` })))}
           
-          <button class="btn btn-ghost text-sm text-surface-400 hover:text-white transition-colors" onclick="leadsFilter={status:[],loanType:[],source:[],agent:[],aging:[],assignment:'assigned',search:'',sort:'created_at',dir:'desc',followUp:'all'};APP.currentPaginationPage=1;fetchLeads()">
+          <button class="btn btn-ghost text-sm text-surface-400 hover:text-white transition-colors" onclick="leadsFilter={status:[],city:[],loanType:[],source:[],agent:[],aging:[],assignment:'assigned',search:'',sort:'created_at',dir:'desc',followUp:'all',dateRange:'all_time',startDate:'',endDate:''};APP.currentPaginationPage=1;saveGlobalDateFilter().then(() => fetchLeads())">
             <i class="fas fa-times"></i> Clear Filter
           </button>
         </div>
@@ -2966,12 +3108,13 @@ function renderLeads() {
                 <th class="cursor-pointer" onclick="toggleSort('follow_up')">Follow Up ${sortIcon('follow_up')}</th>
                 <th class="cursor-pointer" onclick="toggleSort('assigned_at')">Assigned Date ${sortIcon('assigned_at')}</th>
                 <th class="cursor-pointer" onclick="toggleSort('created_at')">Created ${sortIcon('created_at')}</th>
+                <th>Notes</th>
                 <th>Docs</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="leadsTableBody">
-              ${paginatedLeads.length === 0 ? `<tr><td colspan="${canManage?17:16}" class="text-center py-12 text-surface-500">No leads found</td></tr>` :
+              ${paginatedLeads.length === 0 ? `<tr><td colspan="${canManage?18:17}" class="text-center py-12 text-surface-500">No leads found</td></tr>` :
               paginatedLeads.map(l => renderLeadRow(l, canManage)).join('')}
             </tbody>
           </table>
@@ -2985,6 +3128,8 @@ function renderLeads() {
                 <option value="50" ${APP.leadsPerPage === 50 ? 'selected' : ''}>50</option>
                 <option value="75" ${APP.leadsPerPage === 75 ? 'selected' : ''}>75</option>
                 <option value="100" ${APP.leadsPerPage === 100 ? 'selected' : ''}>100</option>
+                <option value="125" ${APP.leadsPerPage === 125 ? 'selected' : ''}>125</option>
+                <option value="250" ${APP.leadsPerPage === 250 ? 'selected' : ''}>250</option>
               </select>
             </div>
             <span class="text-sm text-surface-400">Page ${APP.currentPaginationPage} of ${totalPages}</span>
@@ -3018,8 +3163,8 @@ function renderLeadRow(l, canManage) {
       </div>
     </td>
     <td class="font-mono text-sm">${l.phone}</td>
-    <td class="text-sm text-surface-400 max-w-[150px] truncate" title="${l.email || ''}">${l.email || '—'}</td>
-    <td class="text-sm text-surface-400 max-w-[150px] truncate" title="${l.address || ''}">${l.address || '—'}</td>
+    <td class="text-sm text-surface-400 min-w-[150px] whitespace-normal break-all">${l.email || '—'}</td>
+    <td class="text-sm text-surface-400 min-w-[200px] whitespace-normal break-words">${l.address || '—'}</td>
     <td class="text-sm text-surface-400">${CATEGORY_LABELS[l.lead_category] || l.lead_category || 'Individual'}</td>
     <td><span class="text-sm">${LOAN_LABELS[l.loan_type] || l.loan_type}</span></td>
     <td class="font-medium text-white">${formatCurrency(l.amount_requested)}</td>
@@ -3045,6 +3190,7 @@ function renderLeadRow(l, canManage) {
     </td>
     <td class="text-sm text-surface-400">${formatDate(l.assigned_at)}</td>
     <td class="text-sm text-surface-400">${formatDate(l.created_at)}</td>
+    <td class="text-sm text-surface-400 min-w-[250px] whitespace-normal break-words">${l.notes || '—'}</td>
     <td>
       <div class="flex gap-1">
         ${l.attachments && l.attachments.length > 0 ? `
@@ -3131,6 +3277,7 @@ function toggleSort(field) {
 // ========== PIPELINE (KANBAN) ==========
 function renderPipeline() {
   let vl = getVisibleLeads();
+  vl = filterLeadsByDate(vl);
   
   if (leadsFilter.assignment === 'assigned') {
     vl = vl.filter(l => l.assigned_agent_id);
@@ -3147,7 +3294,10 @@ function renderPipeline() {
         <div>
           <h2 class="font-display font-bold text-2xl text-white">Lead Pipeline</h2>
         </div>
-        ${renderAssignmentFilter()}
+        <div class="flex flex-wrap items-center gap-3">
+          ${renderAssignmentFilter()}
+          ${renderGlobalDateFilter()}
+        </div>
       </div>
       <div class="flex gap-4 overflow-x-auto pb-4">
         ${pipelineStatuses.map(s => {
@@ -3762,6 +3912,7 @@ function showConfirmModalAsync(title, message) {
 // ========== CALLING QUEUE ==========
 function renderCallingQueue() {
   let vl = getVisibleLeads().filter(l => !['disbursed','rejected','dead','not_interested'].includes(l.status));
+  vl = filterLeadsByDate(vl);
   
   if (leadsFilter.assignment === 'assigned') {
     vl = vl.filter(l => l.assigned_agent_id);
@@ -3783,7 +3934,10 @@ function renderCallingQueue() {
         <div>
           <h2 class="font-display font-bold text-2xl text-white">Calling Queue</h2>
         </div>
-        ${renderAssignmentFilter()}
+        <div class="flex flex-wrap items-center gap-3">
+          ${renderAssignmentFilter()}
+          ${renderGlobalDateFilter()}
+        </div>
       </div>
       <div class="space-y-3">
         ${vl.map((l, i) => {
@@ -4321,6 +4475,27 @@ function renderSettings() {
               </select>
             </div>
             <p class="text-xs text-surface-500 mt-2">Select the default view for leads across the system.</p>
+          </div>
+
+          <div class="card mb-4">
+            <h3 class="font-display font-semibold text-white mb-4">Default Global Date Filter</h3>
+            <div class="flex flex-col md:flex-row items-start md:items-center gap-4">
+              <select class="form-input w-full md:w-1/2" onchange="updateDefaultGlobalDateFilter(this.value)">
+                <option value="this_week" ${leadsFilter.dateRange === 'this_week' ? 'selected' : ''}>Current Week</option>
+                <option value="this_month" ${leadsFilter.dateRange === 'this_month' ? 'selected' : ''}>Current Month</option>
+                <option value="this_year" ${leadsFilter.dateRange === 'this_year' ? 'selected' : ''}>Current Year</option>
+                <option value="custom" ${leadsFilter.dateRange === 'custom' ? 'selected' : ''}>Custom Range</option>
+                <option value="all_time" ${(leadsFilter.dateRange === 'all_time' || !leadsFilter.dateRange) ? 'selected' : ''}>All Time</option>
+              </select>
+              ${leadsFilter.dateRange === 'custom' ? `
+                <div class="flex items-center gap-2">
+                  <input type="date" class="form-input py-1.5 px-2 text-xs bg-surface-900 border-surface-700 text-white rounded w-auto" value="${leadsFilter.startDate || ''}" onchange="updateDefaultGlobalStartDate(this.value)">
+                  <span class="text-xs text-surface-500">to</span>
+                  <input type="date" class="form-input py-1.5 px-2 text-xs bg-surface-900 border-surface-700 text-white rounded w-auto" value="${leadsFilter.endDate || ''}" onchange="updateDefaultGlobalEndDate(this.value)">
+                </div>
+              ` : ''}
+            </div>
+            <p class="text-xs text-surface-500 mt-2">Select the default global date range filter for leads across the system.</p>
           </div>
 
           <div class="card">
@@ -5844,7 +6019,7 @@ function showAddMemberModal() {
   if (pwdLabel && pwdInput) {
     pwdLabel.textContent = 'Password *';
     pwdInput.required = true;
-    pwdInput.placeholder = 'Min 6 characters (e.g. Paisa@123)';
+    pwdInput.placeholder = '';
     pwdInput.type = 'password';
     const eyeIcon = document.getElementById('memberPasswordEyeIcon');
     if (eyeIcon) eyeIcon.className = 'fas fa-eye text-sm';
@@ -6723,6 +6898,52 @@ async function updateDefaultLeadAssignment(value) {
   }
 }
 
+async function updateDefaultGlobalDateFilter(value) {
+  try {
+    leadsFilter.dateRange = value;
+    APP.currentPaginationPage = 1;
+    await saveGlobalDateFilter();
+    toast('Default Global Date Filter updated');
+    renderPage();
+    if (APP.currentPage === 'leads') {
+      fetchLeads();
+    }
+  } catch (err) {
+    console.error('Error updating default global date filter:', err);
+    toast('Error updating default global date filter');
+  }
+}
+
+async function updateDefaultGlobalStartDate(value) {
+  try {
+    leadsFilter.startDate = value;
+    APP.currentPaginationPage = 1;
+    await saveGlobalDateFilter();
+    toast('Default Start Date updated');
+    renderPage();
+    if (APP.currentPage === 'leads') {
+      fetchLeads();
+    }
+  } catch (err) {
+    console.error('Error updating default global start date:', err);
+  }
+}
+
+async function updateDefaultGlobalEndDate(value) {
+  try {
+    leadsFilter.endDate = value;
+    APP.currentPaginationPage = 1;
+    await saveGlobalDateFilter();
+    toast('Default End Date updated');
+    renderPage();
+    if (APP.currentPage === 'leads') {
+      fetchLeads();
+    }
+  } catch (err) {
+    console.error('Error updating default global end date:', err);
+  }
+}
+
 async function handleCompanyProfileSubmit(e) {
   e.preventDefault();
   const btn = document.getElementById('saveCompanyProfileBtn');
@@ -7455,6 +7676,7 @@ function showReassignModal(leadId) {
 
 // ========== CSV IMPORT ==========
 let importData = [];
+let importCleanData = [];
 
 function parseCSVRow(rowText) {
   const result = [];
@@ -7555,7 +7777,7 @@ function handleCSVImport(e) {
     document.getElementById('importPreview').classList.remove('hidden');
     document.getElementById('importTable').innerHTML = `
       <table class="data-table">
-        <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>City</th><th>Category</th><th>Status</th><th>Product Type</th><th>Amount</th><th>Source</th></tr></thead>
+        <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>City</th><th>Category</th><th>Status</th><th>Product Type</th><th>Amount</th><th>Source</th><th>Notes</th></tr></thead>
         <tbody>${importData.slice(0, 10).map(r => `<tr>
           <td class="text-white">${r.name || '—'}</td>
           <td>${r.phone || '—'}</td>
@@ -7567,7 +7789,8 @@ function handleCSVImport(e) {
           <td>${r.producttype || r.loantype || '—'}</td>
           <td>${r.amount ? formatCurrency(r.amount) : '—'}</td>
           <td>${r.source || '—'}</td>
-        </tr>`).join('')}${importData.length > 10 ? `<tr><td colspan="10" class="text-center text-surface-500">...and ${importData.length - 10} more</td></tr>` : ''}</tbody>
+          <td class="truncate max-w-xs">${r.notes || '—'}</td>
+        </tr>`).join('')}${importData.length > 10 ? `<tr><td colspan="11" class="text-center text-surface-500">...and ${importData.length - 10} more</td></tr>` : ''}</tbody>
       </table>
     `;
   };
@@ -7590,34 +7813,62 @@ async function confirmImport() {
 }
 
 async function performImport(confirm) {
-  let importProgressInterval;
-  let currentProgress = 0;
-  const totalLeads = importData.length;
-  
+  const BATCH_SIZE = 10;
+
   if (!confirm) {
-    showProgressUI('Importing Leads', `Importing 0 of ${totalLeads}...`);
-  } else {
-    showProgressUI('Importing New Leads', `Processing...`);
-  }
-  
-  importProgressInterval = setInterval(() => {
-    if (currentProgress < 90) {
-      currentProgress += (Math.random() * 15) + 5;
-      if (currentProgress > 90) currentProgress = 90;
-      const currentCount = Math.floor((currentProgress / 100) * totalLeads);
-      updateProgressUI(currentProgress, `Importing ${currentCount} of ${totalLeads}...`);
+    // 1. Initial validation and duplicate check in batches of 10
+    showProgressUI('Analyzing Leads', `Checking duplicates: 0 of ${importData.length}...`);
+    
+    importCleanData = [];
+    let accumulatedDuplicatesCount = 0;
+    let accumulatedNewLeadsCount = 0;
+    let accumulatedDuplicates = [];
+    
+    const totalLeads = importData.length;
+    const totalBatches = Math.ceil(totalLeads / BATCH_SIZE);
+    
+    for (let i = 0; i < totalBatches; i++) {
+      const startIdx = i * BATCH_SIZE;
+      const endIdx = Math.min(startIdx + BATCH_SIZE, totalLeads);
+      const batch = importData.slice(startIdx, endIdx);
+      
+      const progressPercent = Math.round((i / totalBatches) * 100);
+      updateProgressUI(progressPercent, `Checking duplicates: ${startIdx} of ${totalLeads}... (Batch ${i + 1}/${totalBatches})`);
+      
+      try {
+        const res = await fetchAPI('/leads/import', {
+          method: 'POST',
+          body: JSON.stringify({ leads: batch, checkOnly: true })
+        });
+        
+        if (res.status === 'check_result') {
+          accumulatedDuplicatesCount += res.duplicatesCount || 0;
+          accumulatedNewLeadsCount += res.newLeadsCount || 0;
+          if (res.toImport) {
+            importCleanData = importCleanData.concat(res.toImport);
+          }
+          if (res.duplicates) {
+            accumulatedDuplicates = accumulatedDuplicates.concat(res.duplicates);
+          }
+        }
+      } catch (err) {
+        hideProgressUI();
+        toast('Lead validation failed at batch ' + (i + 1) + ': ' + err.message, 'error');
+        return;
+      }
+      
+      // Keep a gap of 2 seconds between each batch
+      if (i < totalBatches - 1) {
+        const pausePercent = Math.round(((i + 0.5) / totalBatches) * 100);
+        updateProgressUI(pausePercent, `Pausing to maintain database stability...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
     }
-  }, 400);
+    
+    updateProgressUI(100, 'Duplicate check completed!');
+    await new Promise(resolve => setTimeout(resolve, 600));
 
-  try {
-    const res = await fetchAPI('/leads/import', {
-      method: 'POST',
-      body: JSON.stringify({ leads: importData, confirm })
-    });
-
-    clearInterval(importProgressInterval);
-
-    if (res.status === 'duplicate_found') {
+    if (accumulatedDuplicatesCount > 0) {
       hideProgressUI();
       let modal = document.getElementById('duplicateImportModal');
       if (!modal) {
@@ -7633,21 +7884,21 @@ async function performImport(confirm) {
             <div class="bg-surface-900 rounded-xl p-4 mb-6 border border-surface-800">
               <div class="flex justify-between items-center mb-3">
                 <span class="text-surface-400">Total Leads</span>
-                <span class="font-bold text-white">${res.duplicatesCount + res.newLeadsCount}</span>
+                <span class="font-bold text-white">${accumulatedDuplicatesCount + accumulatedNewLeadsCount}</span>
               </div>
               <div class="flex justify-between items-center mb-3">
                 <span class="text-surface-400">New / Unique</span>
-                <span class="font-bold text-brand-400">${res.newLeadsCount}</span>
+                <span class="font-bold text-brand-400">${accumulatedNewLeadsCount}</span>
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-surface-400">Duplicates</span>
-                <span class="font-bold text-amber-400">${res.duplicatesCount}</span>
+                <span class="font-bold text-amber-400">${accumulatedDuplicatesCount}</span>
               </div>
             </div>
-            <p class="text-surface-300 text-sm mb-6">Would you like to proceed and import only the ${res.newLeadsCount} new leads?</p>
+            <p class="text-surface-300 text-sm mb-6">Would you like to proceed and import only the ${accumulatedNewLeadsCount} new leads?</p>
             <div class="flex justify-end gap-3">
               <button class="btn btn-secondary" onclick="closeModal('duplicateImportModal')">Cancel</button>
-              <button class="btn btn-primary" onclick="performImport(true); closeModal('duplicateImportModal')">Import ${res.newLeadsCount} New</button>
+              <button class="btn btn-primary" onclick="performImport(true); closeModal('duplicateImportModal')">Import ${accumulatedNewLeadsCount} New</button>
             </div>
           </div>
         </div>
@@ -7655,45 +7906,93 @@ async function performImport(confirm) {
       openModal('duplicateImportModal');
       return;
     }
-    
-    updateProgressUI(100, 'Done!');
-    setTimeout(() => {
-      hideProgressUI();
-      toast(`${res.imported} leads imported successfully. ${res.failed} failed.`);
-      if (res.errors && res.errors.length > 0) {
-          const errorList = document.getElementById('importErrorsList');
-          errorList.innerHTML = res.errors.map(err => `<p class="text-red-400">${err}</p>`).join('');
-          openModal('importErrorsModal');
-      }
-      
-      importData = [];
-      closeModal('importModal');
-      document.getElementById('importPreview').classList.add('hidden');
-      const fileInput = document.getElementById('csvInput');
-      if (fileInput) fileInput.value = '';
-      renderPage();
-      updateUserUI();
-    }, 400);
-  } catch (err) {
-    clearInterval(importProgressInterval);
-    hideProgressUI();
-    toast('Import failed: ' + err.message, 'error');
   }
+
+  // 2. Start batch-wise import process
+  const leadsToImport = importCleanData.length > 0 ? importCleanData : importData;
+  const totalLeads = leadsToImport.length;
+
+  if (totalLeads === 0) {
+    hideProgressUI();
+    toast('No new leads to import.');
+    return;
+  }
+
+  showProgressUI(confirm ? 'Importing New Leads' : 'Importing Leads', `Importing 0 of ${totalLeads}...`);
+
+  const totalBatches = Math.ceil(totalLeads / BATCH_SIZE);
+  let importedCount = 0;
+  let failedCount = 0;
+  let allErrors = [];
+
+  for (let i = 0; i < totalBatches; i++) {
+    const startIdx = i * BATCH_SIZE;
+    const endIdx = Math.min(startIdx + BATCH_SIZE, totalLeads);
+    const batch = leadsToImport.slice(startIdx, endIdx);
+
+    // Calculate progress precisely based on current batch progress
+    const progressPercent = Math.round((i / totalBatches) * 100);
+    updateProgressUI(progressPercent, `Importing ${startIdx} of ${totalLeads}... (Batch ${i + 1}/${totalBatches})`);
+
+    try {
+      const res = await fetchAPI('/leads/import', {
+        method: 'POST',
+        body: JSON.stringify({ leads: batch, confirm: true })
+      });
+
+      importedCount += res.imported || 0;
+      failedCount += res.failed || 0;
+      if (res.errors) {
+        allErrors = allErrors.concat(res.errors);
+      }
+    } catch (err) {
+      failedCount += batch.length;
+      allErrors.push(`Failed to import batch ${i + 1}: ${err.message}`);
+    }
+
+    // Add a 2 seconds gap for batch-wise process for large leads
+    if (i < totalBatches - 1) {
+      const pausePercent = Math.round(((i + 0.5) / totalBatches) * 100);
+      updateProgressUI(pausePercent, `Pausing to maintain database stability...`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+
+  updateProgressUI(100, 'Done!');
+  setTimeout(() => {
+    hideProgressUI();
+    toast(`${importedCount} leads imported successfully. ${failedCount} failed.`);
+    if (allErrors.length > 0) {
+      const errorList = document.getElementById('importErrorsList');
+      errorList.innerHTML = allErrors.map(err => `<p class="text-red-400">${err}</p>`).join('');
+      openModal('importErrorsModal');
+    }
+    
+    importData = [];
+    importCleanData = [];
+    closeModal('importModal');
+    const preview = document.getElementById('importPreview');
+    if (preview) preview.classList.add('hidden');
+    const fileInput = document.getElementById('csvInput');
+    if (fileInput) fileInput.value = '';
+    renderPage();
+    updateUserUI();
+  }, 400);
 }
 
 // ========== EXPORT ==========
 function downloadCSVTemplate() {
-  const templateCSV = `Name,Phone,Email,Address,City,Category,Product Type,Amount,Source,Status
-Aarav Sharma,9876543210,aarav.sharma@email.com,"123, Marine Drive",mumbai,individual,home_loan,5000000,facebook,new
-Priya Patel,9123456789,priya.patel@email.com,"Flat 402, Sunshine Apts",delhi,business,personal_loan,200000,website,new
-Rohan Gupta,9988776655,rohan.gupta@email.com,"Plot 12, Indiranagar",bangalore,individual,car_loan,800000,referral,new
-Sneha Singh,9876501234,sneha.singh@email.com,"5-9-20, Banjara Hills",hyderabad,business,business_loan,1500000,website,new
-Amit Verma,9112233445,amit.verma@email.com,"No 5, Anna Salai",chennai,individual,home_loan,3000000,google,new
-Megha Reddy,9001122334,megha.reddy@email.com,"A-12, Koregaon Park",pune,individual,personal_loan,500000,facebook,new
-Vikram Iyer,9887766554,vikram.iyer@email.com,"15/B, Salt Lake",kolkata,individual,education_loan,1000000,website,new
-Anjali Das,9776655443,anjali.das@email.com,"C-45, Vastrapur",ahmedabad,business,car_loan,700000,google,new
-Rahul Kumar,9665544332,rahul.kumar@email.com,"12, Malviya Nagar",jaipur,individual,personal_loan,300000,referral,new
-Sonia Rao,9554433221,sonia.rao@email.com,"D-10, Gomti Nagar",lucknow,individual,home_loan,4000000,facebook,new`;
+  const templateCSV = `Name,Phone,Email,Address,City,Category,Product Type,Amount,Source,Status,Notes
+Aarav Sharma,9876543210,aarav.sharma@email.com,"123, Marine Drive",mumbai,individual,home_loan,5000000,facebook,new,"Wants low interest rates"
+Priya Patel,9123456789,priya.patel@email.com,"Flat 402, Sunshine Apts",delhi,business,personal_loan,200000,website,new,"Looking for quick disbursal"
+Rohan Gupta,9988776655,rohan.gupta@email.com,"Plot 12, Indiranagar",bangalore,individual,car_loan,800000,referral,new,"Salaried customer"
+Sneha Singh,9876501234,sneha.singh@email.com,"5-9-20, Banjara Hills",hyderabad,business,business_loan,1500000,website,new,"Expanding retail store"
+Amit Verma,9112233445,amit.verma@email.com,"No 5, Anna Salai",chennai,individual,home_loan,3000000,google,new,"Documents ready"
+Megha Reddy,9001122334,megha.reddy@email.com,"A-12, Koregaon Park",pune,individual,personal_loan,500000,facebook,new,"Requires flexible tenure"
+Vikram Iyer,9887766554,vikram.iyer@email.com,"15/B, Salt Lake",kolkata,individual,education_loan,1000000,website,new,"Applying for daughter study"
+Anjali Das,9776655443,anjali.das@email.com,"C-45, Vastrapur",ahmedabad,business,car_loan,700000,google,new,"Self employed IT consultant"
+Rahul Kumar,9665544332,rahul.kumar@email.com,"12, Malviya Nagar",jaipur,individual,personal_loan,300000,referral,new,"Existing bank customer"
+Sonia Rao,9554433221,sonia.rao@email.com,"D-10, Gomti Nagar",lucknow,individual,home_loan,4000000,facebook,new,"Co-applicant is spouse"`;
 
   const blob = new Blob([templateCSV], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

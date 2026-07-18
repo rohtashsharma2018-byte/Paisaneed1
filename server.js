@@ -7,8 +7,14 @@ import dotenv from 'dotenv';
 import { User, Lead, Team, Setting, CallLog, EmailTemplate, EmailLog } from './models.js';
 import bcrypt from 'bcryptjs';
 import { Resend } from 'resend';
+import crypto from 'crypto';
 
 dotenv.config();
+
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  console.warn('WARNING: JWT_SECRET environment variable is not set! Generating a cryptographically secure random secret as fallback.');
+  return crypto.randomBytes(64).toString('hex');
+})();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -206,7 +212,7 @@ const authenticate = (req, res, next) => {
   if (!token) return res.status(401).json({ message: 'Unauthorized' });
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (err) {
@@ -241,7 +247,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
     const token = jwt.sign(
       { id: user._id, role: user.role, name: user.name, team_id: user.team_id },
-      process.env.JWT_SECRET || 'secret',
+      JWT_SECRET,
       { expiresIn: '24h' }
     );
     res.json({ token, user: { id: user._id, name: user.name, role: user.role, email: user.email, team_id: user.team_id } });
@@ -280,40 +286,117 @@ function generateLeadUID() {
 
 app.get('/api/leads', authenticate, async (req, res) => {
   try {
-    const { page = 1, limit = 50, sort = 'created_at', dir = 'desc', search = '', status, loanType, source, agent, aging, assignment, city } = req.query;
+    const { page = 1, limit = 50, sort = 'created_at', dir = 'desc', search = '', status, loanType, source, agent, aging, assignment, city, dateRange, startDate, endDate } = req.query;
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
 
     let query = {};
+    const conditions = [];
+
     if (req.user.role === 'agent') {
-      query.assigned_agent_id = req.user.id;
+      conditions.push({ assigned_agent_id: req.user.id });
     } else if (req.user.role === 'tl' && req.user.team_id) {
       const agentsInTeam = await User.find({ team_id: req.user.team_id }).select('_id');
       const agentIds = agentsInTeam.map(a => a._id);
-      query.assigned_agent_id = { $in: agentIds };
-    }
-
-    if (assignment === 'assigned') {
-      query.assigned_agent_id = { ...query.assigned_agent_id, $exists: true, $ne: null };
-    } else if (assignment === 'unassigned') {
-      // If TL or Agent, this will likely return empty results because their base query requires assigned_agent_id
-      query.assigned_agent_id = null;
+      
+      if (assignment === 'assigned') {
+        if (agent) {
+          const filteredAgents = agent.split(',').filter(id => agentIds.some(aid => aid.toString() === id));
+          conditions.push({ assigned_agent_id: { $in: filteredAgents } });
+        } else {
+          conditions.push({ assigned_agent_id: { $in: agentIds } });
+        }
+      } else if (assignment === 'unassigned') {
+        conditions.push({
+          $or: [
+            { assigned_agent_id: null },
+            { assigned_agent_id: { $exists: false } }
+          ]
+        });
+      } else {
+        const allowedAgents = agent ? agent.split(',').filter(id => agentIds.some(aid => aid.toString() === id)) : agentIds;
+        conditions.push({
+          $or: [
+            { assigned_agent_id: { $in: allowedAgents } },
+            { assigned_agent_id: null },
+            { assigned_agent_id: { $exists: false } }
+          ]
+        });
+      }
+    } else {
+      // Admin/System
+      if (assignment === 'assigned') {
+        if (agent) {
+          conditions.push({ assigned_agent_id: { $in: agent.split(',') } });
+        } else {
+          conditions.push({ assigned_agent_id: { $exists: true, $ne: null } });
+        }
+      } else if (assignment === 'unassigned') {
+        conditions.push({
+          $or: [
+            { assigned_agent_id: null },
+            { assigned_agent_id: { $exists: false } }
+          ]
+        });
+      } else if (agent) {
+        conditions.push({ assigned_agent_id: { $in: agent.split(',') } });
+      }
     }
 
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
-      ];
+      conditions.push({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { phone: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } }
+        ]
+      });
     }
     
-    if (status) query.status = { $in: status.split(',') };
-    if (loanType) query.loan_type = { $in: loanType.split(',') };
-    if (source) query.source = { $in: source.split(',') };
-    if (agent) query.assigned_agent_id = { $in: agent.split(',') };
+    if (status) conditions.push({ status: { $in: status.split(',') } });
+    if (loanType) conditions.push({ loan_type: { $in: loanType.split(',') } });
+    if (source) conditions.push({ source: { $in: source.split(',') } });
+    if (city) conditions.push({ city: { $in: city.split(',') } });
+
+    // Global Date Filter on lead creation date
+    if (dateRange && dateRange !== 'all_time') {
+      const now = new Date();
+      let start = null;
+      let end = null;
+      
+      if (dateRange === 'this_week') {
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+        start = new Date(now.setDate(diff));
+        start.setHours(0, 0, 0, 0);
+      } else if (dateRange === 'this_month') {
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        start.setHours(0, 0, 0, 0);
+      } else if (dateRange === 'this_year') {
+        start = new Date(now.getFullYear(), 0, 1);
+        start.setHours(0, 0, 0, 0);
+      } else if (dateRange === 'custom') {
+        if (startDate) {
+          start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+        }
+        if (endDate) {
+          end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+        }
+      }
+      
+      if (start || end) {
+        const dateQuery = {};
+        if (start) dateQuery.$gte = start;
+        if (end) dateQuery.$lte = end;
+        conditions.push({ created_at: dateQuery });
+      }
+    }
     
-    // Aging filter needs calculated field or complex query - skipping for now as it's complex
+    if (conditions.length > 0) {
+      query = { $and: conditions };
+    }
     
     const total = await Lead.countDocuments(query);
     const leads = await Lead.find(query)
@@ -329,13 +412,103 @@ app.get('/api/leads', authenticate, async (req, res) => {
 
 app.get('/api/leads/all', authenticate, async (req, res) => {
   try {
+    const { dateRange, startDate, endDate, assignment, agent, status, loanType, source, city } = req.query;
     let query = {};
+    const conditions = [];
+
     if (req.user.role === 'agent') {
-      query.assigned_agent_id = req.user.id;
+      conditions.push({ assigned_agent_id: req.user.id });
     } else if (req.user.role === 'tl' && req.user.team_id) {
       const agentsInTeam = await User.find({ team_id: req.user.team_id }).select('_id');
       const agentIds = agentsInTeam.map(a => a._id);
-      query.assigned_agent_id = { $in: agentIds };
+      
+      if (assignment === 'assigned') {
+        if (agent) {
+          const filteredAgents = agent.split(',').filter(id => agentIds.some(aid => aid.toString() === id));
+          conditions.push({ assigned_agent_id: { $in: filteredAgents } });
+        } else {
+          conditions.push({ assigned_agent_id: { $in: agentIds } });
+        }
+      } else if (assignment === 'unassigned') {
+        conditions.push({
+          $or: [
+            { assigned_agent_id: null },
+            { assigned_agent_id: { $exists: false } }
+          ]
+        });
+      } else {
+        const allowedAgents = agent ? agent.split(',').filter(id => agentIds.some(aid => aid.toString() === id)) : agentIds;
+        conditions.push({
+          $or: [
+            { assigned_agent_id: { $in: allowedAgents } },
+            { assigned_agent_id: null },
+            { assigned_agent_id: { $exists: false } }
+          ]
+        });
+      }
+    } else {
+      // Admin/System
+      if (assignment === 'assigned') {
+        if (agent) {
+          conditions.push({ assigned_agent_id: { $in: agent.split(',') } });
+        } else {
+          conditions.push({ assigned_agent_id: { $exists: true, $ne: null } });
+        }
+      } else if (assignment === 'unassigned') {
+        conditions.push({
+          $or: [
+            { assigned_agent_id: null },
+            { assigned_agent_id: { $exists: false } }
+          ]
+        });
+      } else if (agent) {
+        conditions.push({ assigned_agent_id: { $in: agent.split(',') } });
+      }
+    }
+
+    if (status) conditions.push({ status: { $in: status.split(',') } });
+    if (loanType) conditions.push({ loan_type: { $in: loanType.split(',') } });
+    if (source) conditions.push({ source: { $in: source.split(',') } });
+    if (city) conditions.push({ city: { $in: city.split(',') } });
+
+    // Global Date Filter on lead creation date
+    if (dateRange && dateRange !== 'all_time') {
+      const now = new Date();
+      let start = null;
+      let end = null;
+      
+      if (dateRange === 'this_week') {
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+        start = new Date(now.setDate(diff));
+        start.setHours(0, 0, 0, 0);
+      } else if (dateRange === 'this_month') {
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        start.setHours(0, 0, 0, 0);
+      } else if (dateRange === 'this_year') {
+        start = new Date(now.getFullYear(), 0, 1);
+        start.setHours(0, 0, 0, 0);
+      } else if (dateRange === 'custom') {
+        if (startDate) {
+          start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+        }
+        if (endDate) {
+          end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+        }
+      }
+      
+      if (start || end) {
+        const dateQuery = {};
+        if (start) dateQuery.$gte = start;
+        if (end) dateQuery.$lte = end;
+        conditions.push({ created_at: dateQuery });
+      }
+    }
+
+    if (conditions.length > 0) {
+      query = { $and: conditions };
     }
 
     const leads = await Lead.find(query);
@@ -373,7 +546,7 @@ app.post('/api/leads', authenticate, async (req, res) => {
 
 app.post('/api/leads/import', authenticate, async (req, res) => {
   try {
-    const { leads, confirm } = req.body;
+    const { leads, confirm, checkOnly } = req.body;
     if (!Array.isArray(leads)) return res.status(400).json({ message: 'Invalid data format' });
 
     // First pass: identify duplicates (both in DB and within the import file)
@@ -415,8 +588,18 @@ app.post('/api/leads/import', authenticate, async (req, res) => {
       }
     }
 
+    if (checkOnly) {
+      return res.json({
+        status: 'check_result',
+        duplicatesCount: duplicates.length,
+        newLeadsCount: toImport.length,
+        toImport,
+        duplicates
+      });
+    }
+
     if (!confirm && duplicates.length > 0) {
-      return res.json({ status: 'duplicate_found', duplicatesCount: duplicates.length, newLeadsCount: toImport.length });
+      return res.json({ status: 'duplicate_found', duplicatesCount: duplicates.length, newLeadsCount: toImport.length, toImport });
     }
 
     const results = { imported: 0, failed: 0, errors: [] };
@@ -434,6 +617,7 @@ app.post('/api/leads/import', authenticate, async (req, res) => {
           amount_requested: parseInt((leadData.amount || leadData.Amount || '0').toString().replace(/[^0-9]/g, '')) || 0,
           source: leadData.source || leadData.Source || 'website',
           status: ((leadData.status !== undefined ? leadData.status : (leadData.Status !== undefined ? leadData.Status : 'new')) || 'new').toString().toLowerCase().trim(),
+          notes: leadData.notes || leadData.Notes || leadData['Notes'] || '',
           created_at: new Date(),
           updated_at: new Date()
         });
@@ -496,8 +680,8 @@ app.delete('/api/leads/:id', authenticate, async (req, res) => {
     // 2. Remove related allocation history
     const historySetting = await Setting.findOne({ key: 'allocation_history' });
     if (historySetting && Array.isArray(historySetting.value)) {
-      historySetting.value = historySetting.value.filter(h => h.lead_id !== req.params.id);
-      await historySetting.save();
+      const filtered = historySetting.value.filter(h => h && h.lead_id && String(h.lead_id) !== String(req.params.id));
+      await Setting.updateOne({ key: 'allocation_history' }, { $set: { value: filtered } });
     }
     
     res.json({ message: 'Lead and related history deleted' });
@@ -754,7 +938,7 @@ app.get('/api/settings/:key', authenticate, async (req, res) => {
   try {
     const setting = await Setting.findOne({ key: req.params.key });
     if (!setting) {
-      if (['default_lead_assignment', 'theme'].includes(req.params.key)) return res.json(null);
+      if (['default_lead_assignment', 'theme', 'global_date_filter'].includes(req.params.key)) return res.json(null);
       return res.json([]);
     }
     res.json(setting.value);
