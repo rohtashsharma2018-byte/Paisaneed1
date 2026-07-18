@@ -6,7 +6,6 @@
 <title>CRM System – Lead & Calling Agent CRM</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script>
@@ -464,6 +463,10 @@ body.light-theme #loginOverlay > div {
         <div>
           <label class="block text-sm font-medium text-surface-400 mb-1.5">Email</label>
           <input type="email" class="form-input" id="leadEmail" placeholder="rajesh@email.com">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-surface-400 mb-1.5">Lead Address</label>
+          <input type="text" class="form-input" id="leadAddress" placeholder="123 Main St, City, State">
         </div>
         <div>
           <label class="block text-sm font-medium text-surface-400 mb-1.5">City</label>
@@ -1120,6 +1123,8 @@ const APP = {
   teamRoleFilter: 'all',
   teamViewMode: 'list',
   theme: localStorage.getItem('theme') || 'dark',
+  defaultLeadAssignment: localStorage.getItem('defaultLeadAssignment') || 'all',
+  leadsPerPage: parseInt(localStorage.getItem('leadsPerPage')) || 25,
   activeSettingsTab: 'general',
   currentLeadAttachments: [],
   currentFollowUpView: 'table', // calendar, cards, table
@@ -1136,7 +1141,7 @@ const APP = {
   }
 };
 
-let leadsFilter = { status: [], city: [], loanType: [], source: [], agent: [], aging: [], assignment: 'assigned', search: '', sort: 'created_at', dir: 'desc', followUp: 'all' };
+let leadsFilter = { status: [], city: [], loanType: [], source: [], agent: [], aging: [], assignment: APP.defaultLeadAssignment, search: '', sort: 'created_at', dir: 'desc', followUp: 'all' };
 
 function setTheme(theme) {
   APP.theme = theme;
@@ -1483,6 +1488,23 @@ function changePage(delta) {
   fetchLeads();
 }
 
+async function updateLeadsPerPage(value) {
+  try {
+    await fetchAPI('/settings/leads_per_page', {
+        method: 'POST',
+        body: JSON.stringify({ value })
+    });
+    APP.leadsPerPage = parseInt(value);
+    localStorage.removeItem('leadsPerPage');
+    APP.currentPaginationPage = 1;
+    fetchLeads();
+    toast('Leads per page updated');
+  } catch (err) {
+    console.error('Error updating leads per page:', err);
+    toast('Error updating leads per page');
+  }
+}
+
 function changeWorkHistoryPage(delta) {
   APP.workHistoryPage += delta;
   renderPage();
@@ -1496,7 +1518,7 @@ function changeEmailHistoryPage(delta) {
 function buildLeadsUrl() {
   const params = new URLSearchParams({
     page: APP.currentPaginationPage,
-    limit: 50,
+    limit: APP.leadsPerPage,
     sort: leadsFilter.sort,
     dir: leadsFilter.dir,
     search: leadsFilter.search,
@@ -1551,7 +1573,7 @@ async function initApp() {
       leadsData, usersData, teamsData, emailTemplatesData, loanTypesData, sourcesData, distRulesData,
       allocHistoryData, callsData, emailsData, loanLabelsData, companyProfileData,
       leadStatusesData, leadStatusLabelsData, leadPrioritiesData, leadPriorityLabelsData,
-      targetsData, leadCategoriesData, leadCategoryLabelsData, citiesData, cityLabelsData
+      defaultLeadAssignmentData, leadsPerPageData, targetsData, leadCategoriesData, leadCategoryLabelsData, citiesData, cityLabelsData
     ] = await Promise.all([
       fetchAPI(buildLeadsUrl()).catch(err => { console.error('Leads fetch error:', err); return { leads: [], total: 0 }; }),
       fetchAPI('/users').catch(err => { console.error('Users fetch error:', err); return []; }),
@@ -1569,12 +1591,18 @@ async function initApp() {
       fetchAPI('/settings/lead_status_labels').catch(() => ({})),
       fetchAPI('/settings/lead_priorities').catch(() => []),
       fetchAPI('/settings/lead_priority_labels').catch(() => ({})),
+      fetchAPI('/settings/default_lead_assignment').catch(() => 'all'),
+      fetchAPI('/settings/leads_per_page').catch(() => 25),
       fetchAPI('/settings/targets').catch(() => ({})),
       fetchAPI('/settings/lead_categories').catch(() => []),
       fetchAPI('/settings/lead_category_labels').catch(() => ({})),
       fetchAPI('/settings/cities').catch(() => []),
       fetchAPI('/settings/city_labels').catch(() => ({}))
     ]);
+    
+    APP.defaultLeadAssignment = defaultLeadAssignmentData || 'all';
+    APP.leadsPerPage = parseInt(leadsPerPageData) || 25;
+    leadsFilter.assignment = APP.defaultLeadAssignment;
     
     setLeads(leadsData);
     USERS = (usersData || []).map(u => ({ ...u, id: u._id }));
@@ -1968,7 +1996,11 @@ function navigateTo(page) {
     }
   }
 
-  renderPage();
+  if (page === 'leads') {
+    fetchLeads();
+  } else {
+    renderPage();
+  }
   // Close mobile sidebar
   document.getElementById('sidebar').classList.remove('open');
 }
@@ -2077,11 +2109,22 @@ function handleGlobalSearch(q) {
 }
 
 // ========== RENDER PAGE ROUTER ==========
-function renderPage() {
+async function renderPage() {
   destroyCharts();
   const c = document.getElementById('pageContainer');
+  if (APP.currentPage === 'dashboard') {
+    c.innerHTML = '<div class="text-white">Loading dashboard...</div>';
+    try {
+        const allLeads = await fetchAPI('/leads/all');
+        c.innerHTML = renderDashboard(allLeads);
+        initDashboardCharts(allLeads);
+    } catch(e) {
+        console.error(e);
+        c.innerHTML = '<div class="text-white">Error loading dashboard</div>';
+    }
+    return;
+  }
   switch (APP.currentPage) {
-    case 'dashboard': c.innerHTML = renderDashboard(); initDashboardCharts(); break;
     case 'leads': c.innerHTML = renderLeads(); break;
     case 'pipeline': c.innerHTML = renderPipeline(); break;
     case 'followups': c.innerHTML = renderFollowUps(); break;
@@ -2120,8 +2163,8 @@ function renderAssignmentFilter(extraClass = '') {
   `;
 }
 
-function renderDashboard() {
-  let vl = getVisibleLeads();
+function renderDashboard(allLeads) {
+  let vl = allLeads || getVisibleLeads();
   
   if (leadsFilter.assignment === 'assigned') {
     vl = vl.filter(l => l.assigned_agent_id);
@@ -2203,7 +2246,7 @@ function renderDashboard() {
   if (APP.currentRole !== 'agent') {
     const agents = APP.currentRole === 'admin' ? USERS.filter(u => u.role === 'agent' && u.active) : USERS.filter(u => u.role === 'agent' && u.active && u.team_id === getUser(APP.currentUserId)?.team_id);
     const agentStats = agents.map(a => {
-      const aLeads = leads.filter(l => l.assigned_agent_id === a.id);
+      const aLeads = vl.filter(l => l.assigned_agent_id === a.id);
       const aConverted = aLeads.filter(l => l.status === 'disbursed').length;
       const aCalls = new Set(callLogs.filter(c => c.agent_id === a.id).map(c => `${c.lead_id}_${new Date(c.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}`)).size;
       const aFollowups = aLeads.filter(l => { const calls = getLeadCalls(l.id); return calls.some(c => c.follow_up_at && isTodayIST(c.follow_up_at) && c.follow_up_status !== 'done'); }).length;
@@ -2233,7 +2276,7 @@ function renderDashboard() {
     // Team leaderboard
     const teamStats = TEAMS.map(t => {
       const teamAgents = USERS.filter(u => u.team_id === t.id && u.active);
-      const teamLeads = leads.filter(l => teamAgents.some(a => a.id === l.assigned_agent_id));
+      const teamLeads = vl.filter(l => teamAgents.some(a => a.id === l.assigned_agent_id));
       const teamConverted = teamLeads.filter(l => l.status === 'disbursed').length;
       const teamCalls = new Set(callLogs.filter(c => teamAgents.some(a => a.id === c.agent_id)).map(c => `${c.lead_id}_${new Date(c.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}`)).size;
       return { ...t, agentCount: teamAgents.length, total: teamLeads.length, converted: teamConverted, calls: teamCalls };
@@ -2278,7 +2321,7 @@ function renderDashboard() {
   // Recent activity
   const recentCalls = [...callLogs].sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 8);
   const activityHTML = recentCalls.map(c => {
-    const lead = leads.find(l => l.id === c.lead_id);
+    const lead = vl.find(l => l.id === c.lead_id);
     const agent = getUser(c.agent_id);
     if (!lead || !agent) return '';
     return `<div class="flex items-start gap-3 py-3 border-b border-surface-800 last:border-0">
@@ -2463,13 +2506,6 @@ function renderDashboard() {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 mb-6">
-        <div class="card fade-in">
-          <h3 class="font-display font-bold text-white mb-4">Cities Lead Distribution</h3>
-          <div id="cityTreeMap" style="height:400px"></div>
-        </div>
-      </div>
-
       <!-- Bottom row -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="card fade-in border-l-4 border-rose-500/50 flex flex-col h-full">
@@ -2528,8 +2564,15 @@ function renderDashboard() {
 
 function initReportsChart() {}
 
-function initDashboardCharts() {
-  const vl = getVisibleLeads();
+function initDashboardCharts(allLeads) {
+  let vl = allLeads || getVisibleLeads();
+  
+  if (leadsFilter.assignment === 'assigned') {
+    vl = vl.filter(l => l.assigned_agent_id);
+  } else if (leadsFilter.assignment === 'unassigned') {
+    vl = vl.filter(l => !l.assigned_agent_id);
+  }
+  
   const theme = getChartTheme();
   // Funnel chart
   const funnelData = STATUSES.map(s => {
@@ -2580,8 +2623,6 @@ function initDashboardCharts() {
     });
   }
 
-  initTreemap();
-  
   // Secondary chart
   const ctx2 = document.getElementById('secondaryChart');
   if (ctx2) {
@@ -2740,64 +2781,6 @@ function initDashboardCharts() {
   }
 }
 
-function initTreemap() {
-  const container = document.getElementById('cityTreeMap');
-  if (!container) return;
-  
-  container.innerHTML = '';
-  
-  const vl = getVisibleLeads();
-  const cityCounts = {};
-  CITIES.forEach(c => cityCounts[c] = 0);
-  vl.forEach(l => {
-    const city = (l.city || '').toLowerCase();
-    if (cityCounts.hasOwnProperty(city)) {
-      cityCounts[city]++;
-    }
-  });
-  
-  const data = CITIES.map(c => ({ name: CITY_LABELS[c] || c, value: cityCounts[c] })).filter(d => d.value > 0);
-  if (data.length === 0) {
-    container.innerHTML = '<div class="text-surface-500 p-4">No data</div>';
-    return;
-  }
-  
-  const root = d3.hierarchy({children: data})
-    .sum(d => d.value)
-    .sort((a, b) => b.value - a.value);
-    
-  d3.treemap()
-    .size([container.offsetWidth, container.offsetHeight])
-    .padding(0)(root);
-    
-  const svg = d3.select(container)
-    .append("svg")
-    .attr("width", "100%")
-    .attr("height", "100%");
-    
-  const color = d3.scaleOrdinal(d3.schemeCategory10);
-    
-  svg.selectAll("rect")
-    .data(root.leaves())
-    .enter()
-    .append("rect")
-    .attr('x', d => d.x0)
-    .attr('y', d => d.y0)
-    .attr('width', d => d.x1 - d.x0)
-    .attr('height', d => d.y1 - d.y0)
-    .style("stroke", "none")
-    .style("fill", (d, i) => color(i));
-    
-  svg.selectAll("text")
-    .data(root.leaves())
-    .enter()
-    .append("text")
-    .attr("x", d => d.x0 + 5)
-    .attr("y", d => d.y0 + 15)
-    .text(d => `${d.data.name} (${d.data.value})`)
-    .attr("font-size", "10px")
-    .attr("fill", "white");
-}
 
 // ========== LEADS TABLE ==========
 
@@ -2894,11 +2877,10 @@ function getFilteredLeads() {
 
 function renderLeads() {
   const vl = getFilteredLeads();
-  const PAGE_SIZE = 50;
-  const totalPages = Math.ceil(vl.length / PAGE_SIZE) || 1;
+  const PAGE_SIZE = APP.leadsPerPage;
+  const totalPages = Math.ceil(APP.totalLeads / PAGE_SIZE) || 1;
   if (APP.currentPaginationPage > totalPages) APP.currentPaginationPage = totalPages;
-  const start = (APP.currentPaginationPage - 1) * PAGE_SIZE;
-  const paginatedLeads = vl.slice(start, start + PAGE_SIZE);
+  const paginatedLeads = vl;
 
   const now = Date.now();
   const allSelected = paginatedLeads.length > 0 && paginatedLeads.every(l => selectedLeadIds.includes(l.id || l._id));
@@ -2974,6 +2956,7 @@ function renderLeads() {
                 <th class="cursor-pointer" onclick="toggleSort('name')">Name ${sortIcon('name')}</th>
                 <th>Phone</th>
                 <th>Email</th>
+                <th>Address</th>
                 <th class="cursor-pointer" onclick="toggleSort('lead_category')">Category ${sortIcon('lead_category')}</th>
                 <th class="cursor-pointer" onclick="toggleSort('loan_type')">Product Type ${sortIcon('loan_type')}</th>
                 <th class="cursor-pointer" onclick="toggleSort('amount_requested')">Amount ${sortIcon('amount_requested')}</th>
@@ -2989,13 +2972,22 @@ function renderLeads() {
               </tr>
             </thead>
             <tbody id="leadsTableBody">
-              ${paginatedLeads.length === 0 ? `<tr><td colspan="${canManage?16:15}" class="text-center py-12 text-surface-500">No leads found</td></tr>` :
+              ${paginatedLeads.length === 0 ? `<tr><td colspan="${canManage?17:16}" class="text-center py-12 text-surface-500">No leads found</td></tr>` :
               paginatedLeads.map(l => renderLeadRow(l, canManage)).join('')}
             </tbody>
           </table>
         </div>
         <!-- Pagination -->
         <div class="flex items-center justify-between p-4 border-t border-surface-800">
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-surface-400">Leads per page:</span>
+              <select class="form-input py-1 text-sm" onchange="updateLeadsPerPage(this.value)">
+                <option value="25" ${APP.leadsPerPage === 25 ? 'selected' : ''}>25</option>
+                <option value="50" ${APP.leadsPerPage === 50 ? 'selected' : ''}>50</option>
+                <option value="75" ${APP.leadsPerPage === 75 ? 'selected' : ''}>75</option>
+                <option value="100" ${APP.leadsPerPage === 100 ? 'selected' : ''}>100</option>
+              </select>
+            </div>
             <span class="text-sm text-surface-400">Page ${APP.currentPaginationPage} of ${totalPages}</span>
             <div class="flex gap-2">
                 <button class="btn btn-secondary btn-sm ${APP.currentPaginationPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}" 
@@ -3028,6 +3020,7 @@ function renderLeadRow(l, canManage) {
     </td>
     <td class="font-mono text-sm">${l.phone}</td>
     <td class="text-sm text-surface-400 max-w-[150px] truncate" title="${l.email || ''}">${l.email || '—'}</td>
+    <td class="text-sm text-surface-400 max-w-[150px] truncate" title="${l.address || ''}">${l.address || '—'}</td>
     <td class="text-sm text-surface-400">${CATEGORY_LABELS[l.lead_category] || l.lead_category || 'Individual'}</td>
     <td><span class="text-sm">${LOAN_LABELS[l.loan_type] || l.loan_type}</span></td>
     <td class="font-medium text-white">${formatCurrency(l.amount_requested)}</td>
@@ -4319,6 +4312,18 @@ function renderSettings() {
         ` : ''}
 
         ${APP.activeSettingsTab === 'leads' ? `
+          <div class="card mb-4">
+            <h3 class="font-display font-semibold text-white mb-4">Default Lead Assignment</h3>
+            <div class="flex items-center gap-4">
+              <select class="form-input w-full md:w-1/2" onchange="updateDefaultLeadAssignment(this.value)">
+                <option value="all" ${APP.defaultLeadAssignment === 'all' ? 'selected' : ''}>All Leads</option>
+                <option value="unassigned" ${APP.defaultLeadAssignment === 'unassigned' ? 'selected' : ''}>Unassigned</option>
+                <option value="assigned" ${APP.defaultLeadAssignment === 'assigned' ? 'selected' : ''}>Assigned</option>
+              </select>
+            </div>
+            <p class="text-xs text-surface-500 mt-2">Select the default view for leads across the system.</p>
+          </div>
+
           <div class="card">
             <h3 class="font-display font-semibold text-white mb-4">Lead Statuses</h3>
             <div class="space-y-2 max-h-60 overflow-y-auto">
@@ -5942,7 +5947,12 @@ function populateCategorySelect(selectedId) {
 function populateCitySelect(selectedId) {
   const sel = document.getElementById('leadCity');
   if (sel) {
-    const sortedCities = [...CITIES].sort((a, b) => (CITY_LABELS[a] || a).localeCompare(CITY_LABELS[b] || b));
+    const uniqueCities = [...new Set(CITIES)];
+    const sortedCities = uniqueCities.sort((a, b) => {
+      const nameA = (CITY_LABELS[a] || a).toLowerCase();
+      const nameB = (CITY_LABELS[b] || b).toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
     sel.innerHTML = '<option value="">Select City...</option>' + sortedCities.map(c => `<option value="${c}" ${c === selectedId ? 'selected' : ''}>${CITY_LABELS[c] || c}</option>`).join('');
   }
 }
@@ -6002,6 +6012,7 @@ function showAddLeadModal() {
   document.getElementById('leadSubmitBtn').textContent = 'Add Lead';
   document.getElementById('duplicateWarning').classList.add('hidden');
   document.getElementById('leadDeleteBtn').classList.add('hidden');
+  populateCitySelect();
   populateAgentSelect();
   populateCategorySelect();
   populateLoanTypeSelect();
@@ -6020,6 +6031,7 @@ function showEditLeadModal(id) {
   document.getElementById('leadName').value = lead.name;
   document.getElementById('leadPhone').value = lead.phone;
   document.getElementById('leadEmail').value = lead.email || '';
+  document.getElementById('leadAddress').value = lead.address || '';
   populateCitySelect(lead.city);
   populateCategorySelect(lead.lead_category);
   populateLoanTypeSelect(lead.loan_type);
@@ -6696,6 +6708,22 @@ async function handleSendEmailSubmit(e) {
   }
 }
 
+async function updateDefaultLeadAssignment(value) {
+  try {
+    await fetchAPI('/settings/default_lead_assignment', {
+        method: 'POST',
+        body: JSON.stringify({ value })
+    });
+    APP.defaultLeadAssignment = value;
+    localStorage.removeItem('defaultLeadAssignment');
+    leadsFilter.assignment = value;
+    toast('Default Lead Assignment updated');
+  } catch (err) {
+    console.error('Error updating default lead assignment:', err);
+    toast('Error updating default lead assignment');
+  }
+}
+
 async function handleCompanyProfileSubmit(e) {
   e.preventDefault();
   const btn = document.getElementById('saveCompanyProfileBtn');
@@ -7052,6 +7080,7 @@ async function handleLeadSubmit(e) {
   const name = document.getElementById('leadName').value.trim();
   const phone = document.getElementById('leadPhone').value.trim();
   const email = document.getElementById('leadEmail').value.trim();
+  const address = document.getElementById('leadAddress').value.trim();
   const city = document.getElementById('leadCity').value.trim();
   const category = document.getElementById('leadCategory').value;
   const loanType = document.getElementById('leadLoanType').value;
@@ -7069,7 +7098,7 @@ async function handleLeadSubmit(e) {
 
   try {
     const payload = {
-      name, phone, email, city,
+      name, phone, email, address, city,
       lead_category: category,
       loan_type: loanType,
       amount_requested: amount,
@@ -7257,6 +7286,7 @@ async function showLeadDetail(id) {
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
           <div><p class="text-xs text-surface-500 mb-1">Phone</p><p class="text-white font-medium">${lead.phone}</p></div>
           <div><p class="text-xs text-surface-500 mb-1">Email</p><p class="text-white font-medium">${lead.email || '—'}</p></div>
+          <div class="col-span-2 md:col-span-3"><p class="text-xs text-surface-500 mb-1">Lead Address</p><p class="text-white font-medium">${lead.address || '—'}</p></div>
           <div><p class="text-xs text-surface-500 mb-1">Amount</p><p class="text-white font-medium text-lg">${formatCurrency(lead.amount_requested)}</p></div>
           <div><p class="text-xs text-surface-500 mb-1">Source</p><p class="text-white font-medium">${lead.source}</p></div>
           <div><p class="text-xs text-surface-500 mb-1">Status</p><span class="${getStatusBadgeClass(lead.status || 'new')}">${STATUS_LABELS[lead.status] || lead.status || '—'}</span></div>
@@ -7526,18 +7556,19 @@ function handleCSVImport(e) {
     document.getElementById('importPreview').classList.remove('hidden');
     document.getElementById('importTable').innerHTML = `
       <table class="data-table">
-        <thead><tr><th>Name</th><th>Phone</th><th>City</th><th>Category</th><th>Email</th><th>Status</th><th>Product Type</th><th>Amount</th><th>Source</th></tr></thead>
+        <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>City</th><th>Category</th><th>Status</th><th>Product Type</th><th>Amount</th><th>Source</th></tr></thead>
         <tbody>${importData.slice(0, 10).map(r => `<tr>
           <td class="text-white">${r.name || '—'}</td>
           <td>${r.phone || '—'}</td>
+          <td>${r.email || '—'}</td>
+          <td>${r.address || '—'}</td>
           <td>${r.city || '—'}</td>
           <td>${r.category || r.leadcategory || '—'}</td>
-          <td>${r.email || '—'}</td>
           <td>${r.status || '—'}</td>
           <td>${r.producttype || r.loantype || '—'}</td>
           <td>${r.amount ? formatCurrency(r.amount) : '—'}</td>
           <td>${r.source || '—'}</td>
-        </tr>`).join('')}${importData.length > 10 ? `<tr><td colspan="9" class="text-center text-surface-500">...and ${importData.length - 10} more</td></tr>` : ''}</tbody>
+        </tr>`).join('')}${importData.length > 10 ? `<tr><td colspan="10" class="text-center text-surface-500">...and ${importData.length - 10} more</td></tr>` : ''}</tbody>
       </table>
     `;
   };
@@ -7653,17 +7684,17 @@ async function performImport(confirm) {
 
 // ========== EXPORT ==========
 function downloadCSVTemplate() {
-  const templateCSV = `Name,Phone,Email,City,Category,Product Type,Amount,Source,Status
-Aarav Sharma,9876543210,aarav.sharma@email.com,mumbai,individual,home_loan,5000000,facebook,new
-Priya Patel,9123456789,priya.patel@email.com,delhi,business,personal_loan,200000,website,new
-Rohan Gupta,9988776655,rohan.gupta@email.com,bangalore,individual,car_loan,800000,referral,new
-Sneha Singh,9876501234,sneha.singh@email.com,hyderabad,business,business_loan,1500000,website,new
-Amit Verma,9112233445,amit.verma@email.com,chennai,individual,home_loan,3000000,google,new
-Megha Reddy,9001122334,megha.reddy@email.com,pune,individual,personal_loan,500000,facebook,new
-Vikram Iyer,9887766554,vikram.iyer@email.com,kolkata,individual,education_loan,1000000,website,new
-Anjali Das,9776655443,anjali.das@email.com,ahmedabad,business,car_loan,700000,google,new
-Rahul Kumar,9665544332,rahul.kumar@email.com,jaipur,individual,personal_loan,300000,referral,new
-Sonia Rao,9554433221,sonia.rao@email.com,lucknow,individual,home_loan,4000000,facebook,new`;
+  const templateCSV = `Name,Phone,Email,Address,City,Category,Product Type,Amount,Source,Status
+Aarav Sharma,9876543210,aarav.sharma@email.com,"123, Marine Drive",mumbai,individual,home_loan,5000000,facebook,new
+Priya Patel,9123456789,priya.patel@email.com,"Flat 402, Sunshine Apts",delhi,business,personal_loan,200000,website,new
+Rohan Gupta,9988776655,rohan.gupta@email.com,"Plot 12, Indiranagar",bangalore,individual,car_loan,800000,referral,new
+Sneha Singh,9876501234,sneha.singh@email.com,"5-9-20, Banjara Hills",hyderabad,business,business_loan,1500000,website,new
+Amit Verma,9112233445,amit.verma@email.com,"No 5, Anna Salai",chennai,individual,home_loan,3000000,google,new
+Megha Reddy,9001122334,megha.reddy@email.com,"A-12, Koregaon Park",pune,individual,personal_loan,500000,facebook,new
+Vikram Iyer,9887766554,vikram.iyer@email.com,"15/B, Salt Lake",kolkata,individual,education_loan,1000000,website,new
+Anjali Das,9776655443,anjali.das@email.com,"C-45, Vastrapur",ahmedabad,business,car_loan,700000,google,new
+Rahul Kumar,9665544332,rahul.kumar@email.com,"12, Malviya Nagar",jaipur,individual,personal_loan,300000,referral,new
+Sonia Rao,9554433221,sonia.rao@email.com,"D-10, Gomti Nagar",lucknow,individual,home_loan,4000000,facebook,new`;
 
   const blob = new Blob([templateCSV], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -7709,11 +7740,12 @@ function exportFollowUpsCSV() {
 
 function exportLeadsCSV(selectedOnly = false) {
   const vl = selectedOnly ? leads.filter(l => selectedLeadIds.includes(l.id || l._id)) : getFilteredLeads();
-  let csv = 'Name,Phone,Email,City,Category,Product Type,Amount,Source,Status,Agent,Aging,Assigned At,Created At\n';
+  let csv = 'Name,Phone,Email,Address,City,Category,Product Type,Amount,Source,Status,Agent,Aging,Assigned At,Created At\n';
   vl.forEach(l => {
     const escapedName = (l.name || '').replace(/"/g, '""');
     const escapedPhone = (l.phone || '').replace(/"/g, '""');
     const escapedEmail = (l.email || '').replace(/"/g, '""');
+    const escapedAddress = (l.address || '').replace(/"/g, '""');
     const escapedCity = (l.city || '').replace(/"/g, '""');
     const escapedCategory = (CATEGORY_LABELS[l.lead_category] || l.lead_category || 'Individual').replace(/"/g, '""');
     const escapedLoanType = (LOAN_LABELS[l.loan_type] || l.loan_type || '').replace(/"/g, '""');
@@ -7725,7 +7757,7 @@ function exportLeadsCSV(selectedOnly = false) {
     const assignedAt = formatDate(l.assigned_at);
     const createdAt = formatDate(l.created_at);
     
-    csv += `"${escapedName}","${escapedPhone}","${escapedEmail}","${escapedCity}","${escapedCategory}","${escapedLoanType}","${escapedAmount}","${escapedSource}","${escapedStatus}","${escapedAgentName}","${aging}","${assignedAt}","${createdAt}"\n`;
+    csv += `"${escapedName}","${escapedPhone}","${escapedEmail}","${escapedAddress}","${escapedCity}","${escapedCategory}","${escapedLoanType}","${escapedAmount}","${escapedSource}","${escapedStatus}","${escapedAgentName}","${aging}","${assignedAt}","${createdAt}"\n`;
   });
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

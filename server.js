@@ -327,6 +327,24 @@ app.get('/api/leads', authenticate, async (req, res) => {
   }
 });
 
+app.get('/api/leads/all', authenticate, async (req, res) => {
+  try {
+    let query = {};
+    if (req.user.role === 'agent') {
+      query.assigned_agent_id = req.user.id;
+    } else if (req.user.role === 'tl' && req.user.team_id) {
+      const agentsInTeam = await User.find({ team_id: req.user.team_id }).select('_id');
+      const agentIds = agentsInTeam.map(a => a._id);
+      query.assigned_agent_id = { $in: agentIds };
+    }
+
+    const leads = await Lead.find(query);
+    res.json(leads);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 app.post('/api/leads', authenticate, async (req, res) => {
   try {
     const { phone, email } = req.body;
@@ -409,6 +427,7 @@ app.post('/api/leads/import', authenticate, async (req, res) => {
           name: leadData.name || leadData.Name,
           phone: leadData.phone || leadData.Phone,
           email: leadData.email || leadData.Email,
+          address: leadData.address || leadData.Address || '',
           city: (leadData.city || leadData.City || '').toString().toLowerCase().trim(),
           lead_category: leadData.category || leadData.leadcategory || leadData.Category || 'Individual',
           loan_type: leadData.producttype || leadData['product type'] || leadData['Product Type'] || leadData.loantype || leadData['loan type'] || leadData['Loan Type'] || 'personal_loan',
@@ -734,7 +753,11 @@ app.get('/api/email-logs/:leadId', authenticate, async (req, res) => {
 app.get('/api/settings/:key', authenticate, async (req, res) => {
   try {
     const setting = await Setting.findOne({ key: req.params.key });
-    res.json(setting ? setting.value : []);
+    if (!setting) {
+      if (['default_lead_assignment', 'theme'].includes(req.params.key)) return res.json(null);
+      return res.json([]);
+    }
+    res.json(setting.value);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
