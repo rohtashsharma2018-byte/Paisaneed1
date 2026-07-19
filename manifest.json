@@ -1,0 +1,15 @@
+{
+  "name": "CRM System",
+  "short_name": "CRM",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f110f",
+  "theme_color": "#1c1917",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
